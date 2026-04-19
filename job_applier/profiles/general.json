@@ -9,13 +9,14 @@
   "job_titles": [
     "Data Scientist",
     "Machine Learning Engineer",
+    "AI Engineer",
+    "Automation Engineer",
     "Generative AI Engineer",
     "LLM Engineer",
-    "AI Engineer",
     "MLOps Engineer",
-    "AI/ML Consultant"
+    "Applied Scientist"
   ],
-  "keywords": ["data scientist", "machine learning engineer", "generative AI", "LLM engineer", "AI engineer", "MLOps"],
+  "keywords": ["data scientist", "machine learning engineer", "AI engineer", "automation engineer", "generative AI", "LLM engineer", "MLOps"],
   "years_experience": "5",
-  "cover_letter": "I am a Data Science Consultant with 5+ years of experience building end-to-end ML, AI, and LLM-driven systems. My work spans fine-tuning LLMs, multi-agent RAG pipelines processing 100K+ documents with 92% search accuracy, and production MLOps with Docker, AWS SageMaker, and MLflow. I hold AWS ML Specialty and GenAI certifications, and I would welcome the opportunity to contribute to your team."
+  "cover_letter": "I am a Data Science Consultant with 5+ years of experience building end-to-end ML, AI, and LLM-driven systems. My work spans fine-tuning LLMs, multi-agent RAG pipelines processing 100K+ documents with 92% search accuracy, and production MLOps with Docker, AWS SageMaker, and MLflow. I hold AWS ML Specialty and Generative AI certifications. I would welcome the opportunity to contribute to your team."
 }

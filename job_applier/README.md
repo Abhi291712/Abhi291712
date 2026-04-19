@@ -1,30 +1,38 @@
-# Job Application Bot
+# Job Application Bot (Multi-Site)
 
-Automates job applications on **CVS Health** and **UHC (UnitedHealth Group)** career sites using 3 profiles: Healthcare, Finance, General.
+Automated job applications across **7 sites** targeting Data Science / ML / AI / Automation Engineer roles.
+
+## Supported Sites
+
+| Site | Feature |
+|------|---------|
+| **LinkedIn** | Easy Apply (multi-step) |
+| **Indeed** | Indeed Apply |
+| **Dice** | Easy Apply (great for tech) |
+| **Glassdoor** | Easy Apply |
+| **ZipRecruiter** | 1-Click Apply |
+| **CVS Health** | Career portal |
+| **UHC** | Career portal |
+
+## Profiles
+
+Each profile maps to a resume and targets different roles:
+
+| Profile | Resume | Target Roles |
+|---------|--------|--------------|
+| **Healthcare** | `Abhishekcvs.pdf` | Healthcare Data Scientist, Clinical ML/AI Engineer |
+| **Finance** | `ABHISHEK@NW.pdf` | Credit Risk DS, Quant ML, Finance AI/Automation |
+| **General** | `Generative AI Engineer.pdf` | Data Scientist, ML/AI/Automation Engineer, LLM/GenAI |
 
 ## Setup
 
-### 1. Install Python dependencies
 ```bash
 cd job_applier
 pip install -r requirements.txt
 playwright install chromium
 ```
 
-### 2. Add your 3 resumes
-Place your PDF resumes in the `resumes/` folder:
-```
-resumes/healthcare_resume.pdf
-resumes/finance_resume.pdf
-resumes/general_resume.pdf
-```
-
-### 3. Check your credentials
-Credentials are in `.env` (never committed to git):
-```
-EMAIL=abhisheknkp7292@gmail.com
-PASSWORD=********
-```
+Credentials already in `.env` (local only, git-ignored).
 
 ## Usage
 
@@ -32,32 +40,54 @@ PASSWORD=********
 python main.py
 ```
 
-You'll be prompted to:
-1. Pick a profile (Healthcare / Finance / General)
-2. Pick a site (CVS / UHC / Both)
-3. Set how many jobs to apply to
-4. Run in background or watch it
+Prompts:
+1. Pick profile (1=Healthcare, 2=Finance, 3=General)
+2. Pick sites (e.g. `1,2,3` or `A` for all)
+3. Max jobs per search
+4. Headless Y/N (pick **N** for first run)
 
-## How It Works
+## Project Structure
 
-1. Reads your resume PDF
-2. Extracts name + phone from it
-3. Logs into career site
-4. Searches jobs matching your profile keywords
-5. Fills and submits each application with your resume + cover letter
-6. Logs results to `logs/apply.log`
+```
+job_applier/
+├── main.py                  # Entry point
+├── config.py                # Loads .env + profiles
+├── sites/
+│   ├── base.py              # Shared JobSite base class
+│   ├── linkedin.py
+│   ├── indeed.py
+│   ├── dice.py
+│   ├── glassdoor.py
+│   ├── ziprecruiter.py
+│   ├── cvs.py
+│   └── uhc.py
+├── profiles/
+│   ├── healthcare.json
+│   ├── finance.json
+│   └── general.json
+├── logs/apply.log           # Run history
+└── .env                     # Credentials (local)
+```
 
-## Files
+## Tips
 
-- `main.py` — run this
-- `cvs_apply.py` — CVS automation
-- `uhc_apply.py` — UHC automation
-- `resume_parser.py` — extracts text from PDF/DOCX
-- `profiles/*.json` — edit job titles, keywords, cover letter per profile
-- `.env` — your credentials (local only, not in git)
+- **Watch the first run.** Sites have CAPTCHAs + bot detection.
+- **Start small** — 3 jobs per site is safe.
+- **LinkedIn/Indeed** are best for bulk applications.
+- **Dice** is most relevant for your tech stack.
+- If selectors break, edit the respective `sites/*.py` file.
 
-## Safety Notes
+## Adding a New Site
 
-- Always watch the first run (uncheck headless) to make sure it behaves
-- Career sites change layouts often — selectors may need tweaks
-- Don't run too many applications at once (risk of rate-limiting)
+Create `sites/newsite.py`:
+```python
+from sites.base import JobSite
+
+class NewSite(JobSite):
+    name = "newsite"
+    login_url = "https://..."
+    async def login(self, page): ...
+    async def search_and_apply(self, page, job_title, max_jobs): ...
+```
+
+Register in `sites/__init__.py`.

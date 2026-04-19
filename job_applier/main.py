@@ -3,12 +3,12 @@ import logging
 import os
 import sys
 from colorama import Fore, Style, init
-from config import load_profile, PROFILES
-from cvs_apply import run_cvs
-from uhc_apply import run_uhc
+from config import load_profile, PROFILES, EMAIL, PASSWORD
+from sites import SITES
 
 init(autoreset=True)
 
+os.makedirs(os.path.join(os.path.dirname(__file__), "logs"), exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(message)s",
@@ -19,7 +19,7 @@ logging.basicConfig(
 )
 
 
-def menu(title: str, options: list[str]) -> str:
+def pick_one(title: str, options: list[str]) -> str:
     print(f"\n{Fore.CYAN}{title}{Style.RESET_ALL}")
     for i, opt in enumerate(options, 1):
         print(f"  {Fore.YELLOW}{i}.{Style.RESET_ALL} {opt}")
@@ -27,50 +27,68 @@ def menu(title: str, options: list[str]) -> str:
         choice = input("Enter number: ").strip()
         if choice.isdigit() and 1 <= int(choice) <= len(options):
             return options[int(choice) - 1]
-        print("Invalid choice, try again.")
+        print("Invalid choice.")
+
+
+def pick_many(title: str, options: list[str]) -> list[str]:
+    print(f"\n{Fore.CYAN}{title}{Style.RESET_ALL}")
+    for i, opt in enumerate(options, 1):
+        print(f"  {Fore.YELLOW}{i}.{Style.RESET_ALL} {opt}")
+    print(f"  {Fore.YELLOW}A.{Style.RESET_ALL} ALL sites")
+    while True:
+        raw = input("Enter numbers separated by commas (or 'A' for all): ").strip().upper()
+        if raw == "A":
+            return options[:]
+        try:
+            picks = [int(x.strip()) for x in raw.split(",") if x.strip()]
+            if picks and all(1 <= p <= len(options) for p in picks):
+                return [options[p - 1] for p in picks]
+        except ValueError:
+            pass
+        print("Invalid input.")
 
 
 async def main():
-    print(f"\n{Fore.GREEN}=== Job Application Bot ==={Style.RESET_ALL}")
-    print(f"Email: abhisheknkp7292@gmail.com\n")
+    print(f"\n{Fore.GREEN}=== Job Application Bot (Multi-Site) ==={Style.RESET_ALL}")
+    print(f"User: {EMAIL}\n")
 
-    # Choose profile
-    profile_name = menu("Select application profile:", PROFILES)
+    profile_name = pick_one("Select profile:", PROFILES)
     profile = load_profile(profile_name)
-    print(f"{Fore.GREEN}Profile loaded: {profile['profile_name']}{Style.RESET_ALL}")
+    print(f"{Fore.GREEN}Profile: {profile['profile_name']}{Style.RESET_ALL}")
 
-    # Verify resume exists (supports absolute Windows paths or relative)
     resume_path = profile["resume_file"]
     if not os.path.isabs(resume_path):
         resume_path = os.path.join(os.path.dirname(__file__), resume_path)
     if not os.path.exists(resume_path):
         print(f"{Fore.RED}Resume not found: {resume_path}{Style.RESET_ALL}")
-        print(f"Please update profiles/{profile_name}.json with the correct path.")
         sys.exit(1)
     print(f"{Fore.GREEN}Resume: {resume_path}{Style.RESET_ALL}")
+    print(f"{Fore.GREEN}Target roles: {', '.join(profile['job_titles'][:4])}...{Style.RESET_ALL}")
 
-    # Choose site
-    site = menu("Select job site to apply to:", ["CVS Health", "UHC (United Health Group)", "Both"])
+    site_names = list(SITES.keys())
+    chosen = pick_many("Select job sites:", site_names)
 
-    # How many jobs
-    max_jobs_input = input("\nHow many jobs to apply to? (default 5): ").strip()
+    max_jobs_input = input("\nMax jobs per search (default 5): ").strip()
     max_jobs = int(max_jobs_input) if max_jobs_input.isdigit() else 5
 
-    # Headless mode
     headless_input = input("Run in background (headless)? [y/N]: ").strip().lower()
     headless = headless_input == "y"
 
-    print(f"\n{Fore.GREEN}Starting applications...{Style.RESET_ALL}\n")
+    print(f"\n{Fore.GREEN}Starting on {len(chosen)} sites...{Style.RESET_ALL}\n")
 
-    if site in ("CVS Health", "Both"):
-        print(f"{Fore.CYAN}--- Applying on CVS Health ---{Style.RESET_ALL}")
-        await run_cvs(profile, max_jobs=max_jobs, headless=headless)
+    total = 0
+    for site_key in chosen:
+        SiteClass = SITES[site_key]
+        site = SiteClass(profile=profile, email=EMAIL, password=PASSWORD)
+        print(f"\n{Fore.CYAN}--- {site.name.upper()} ---{Style.RESET_ALL}")
+        try:
+            await site.run(max_jobs=max_jobs, headless=headless)
+            total += site.applied_count
+        except Exception as e:
+            print(f"{Fore.RED}[{site.name}] failed: {e}{Style.RESET_ALL}")
 
-    if site in ("UHC (United Health Group)", "Both"):
-        print(f"{Fore.CYAN}--- Applying on UHC ---{Style.RESET_ALL}")
-        await run_uhc(profile, max_jobs=max_jobs, headless=headless)
-
-    print(f"\n{Fore.GREEN}Done! Check logs/apply.log for details.{Style.RESET_ALL}")
+    print(f"\n{Fore.GREEN}Done. Total applications submitted: {total}{Style.RESET_ALL}")
+    print(f"Logs: logs/apply.log")
 
 
 if __name__ == "__main__":

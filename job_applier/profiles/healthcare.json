@@ -8,13 +8,14 @@
   "linkedin": "",
   "job_titles": [
     "Healthcare Data Scientist",
-    "Clinical Data Scientist",
+    "Clinical ML Engineer",
     "Healthcare AI Engineer",
     "Medical ML Engineer",
-    "Health Informatics Data Scientist",
-    "Clinical AI/ML Engineer"
+    "Healthcare Automation Engineer",
+    "Clinical Data Scientist",
+    "Health Data Scientist"
   ],
-  "keywords": ["healthcare data scientist", "clinical ML", "healthcare AI", "patient data", "medical machine learning"],
+  "keywords": ["healthcare data scientist", "clinical ML", "healthcare AI", "medical machine learning", "healthcare automation"],
   "years_experience": "5",
-  "cover_letter": "I am a Data Science Consultant with 5+ years of experience building scalable ML and LLM-driven solutions, including healthcare-focused work such as patient readmission prediction, OSCE-based clinical simulations with HIPAA/PHI guardrails, and fairness assessments on clinical models. My background in RAG pipelines, MLOps, and AWS/Databricks makes me well-suited to drive data-driven healthcare outcomes. I would welcome the opportunity to contribute to your team."
+  "cover_letter": "I am a Data Science Consultant with 5+ years of experience building scalable ML and LLM-driven solutions, including healthcare work such as patient readmission prediction, OSCE-based clinical simulations with HIPAA/PHI guardrails, and fairness analysis on clinical models. I bring strong expertise in RAG pipelines, MLOps (Docker, AWS SageMaker, MLflow), and explainability (SHAP/LIME). I would welcome the opportunity to contribute to your team."
 }

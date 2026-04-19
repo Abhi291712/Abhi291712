@@ -8,13 +8,14 @@
   "linkedin": "",
   "job_titles": [
     "Financial Data Scientist",
-    "Credit Risk Analyst",
-    "Quantitative Analyst",
-    "Risk Modeling Data Scientist",
-    "Finance ML Engineer",
-    "Fraud Analytics Data Scientist"
+    "Quantitative ML Engineer",
+    "Risk AI Engineer",
+    "Credit Risk Data Scientist",
+    "Fraud Detection ML Engineer",
+    "Finance Automation Engineer",
+    "Quant Data Scientist"
   ],
-  "keywords": ["financial data scientist", "credit risk", "quantitative analyst", "fraud analytics", "finance machine learning"],
+  "keywords": ["financial data scientist", "credit risk ML", "quantitative analyst", "fraud analytics", "finance machine learning", "risk modeling"],
   "years_experience": "5",
-  "cover_letter": "I am a Data Science Consultant with 5+ years of experience delivering ML-driven solutions in finance, including credit risk scoring, demand forecasting with ARIMA/XGBoost/LSTM that prevented $3.2M in annual losses, and real-time analytics that generated $2.1M in incremental revenue. I bring strong expertise in Python, AWS SageMaker, Databricks, MLOps, and model explainability (SHAP/LIME). I would welcome the opportunity to apply this background to your team."
+  "cover_letter": "I am a Data Science Consultant with 5+ years of experience delivering ML-driven solutions in finance, including credit risk scoring, multi-model demand forecasting (ARIMA, XGBoost, LSTM) that prevented $3.2M in annual losses, and real-time analytics that generated $2.1M in incremental revenue. I bring strong expertise in Python, AWS SageMaker, Databricks, MLOps, and model explainability (SHAP/LIME). I would welcome the opportunity to contribute to your team."
 }
