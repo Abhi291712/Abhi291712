@@ -1,7 +1,20 @@
 {
   "profile_name": "Finance",
-  "resume_file": "resumes/finance_resume.pdf",
-  "job_titles": ["Financial Analyst", "Accountant", "Finance Coordinator", "Billing Specialist", "Revenue Cycle Analyst"],
-  "keywords": ["finance", "accounting", "financial", "billing", "revenue", "budget"],
-  "cover_letter": "I am applying for this finance position with solid experience in financial analysis, accounting, and data-driven decision making. I am committed to delivering accurate financial insights that support organizational goals."
+  "resume_file": "C:/Users/ual-laptop/Downloads/ABHISHEK@NW (1) (2) (1).pdf",
+  "full_name": "Abhishek Kumar",
+  "email": "abhisheknkp7291@gmail.com",
+  "phone": "5204769641",
+  "location": "CA, USA",
+  "linkedin": "",
+  "job_titles": [
+    "Financial Data Scientist",
+    "Credit Risk Analyst",
+    "Quantitative Analyst",
+    "Risk Modeling Data Scientist",
+    "Finance ML Engineer",
+    "Fraud Analytics Data Scientist"
+  ],
+  "keywords": ["financial data scientist", "credit risk", "quantitative analyst", "fraud analytics", "finance machine learning"],
+  "years_experience": "5",
+  "cover_letter": "I am a Data Science Consultant with 5+ years of experience delivering ML-driven solutions in finance, including credit risk scoring, demand forecasting with ARIMA/XGBoost/LSTM that prevented $3.2M in annual losses, and real-time analytics that generated $2.1M in incremental revenue. I bring strong expertise in Python, AWS SageMaker, Databricks, MLOps, and model explainability (SHAP/LIME). I would welcome the opportunity to apply this background to your team."
 }

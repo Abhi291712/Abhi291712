@@ -1,7 +1,21 @@
 {
   "profile_name": "General",
-  "resume_file": "resumes/general_resume.pdf",
-  "job_titles": ["Customer Service Representative", "Administrative Assistant", "Operations Coordinator", "Team Lead", "Office Manager"],
-  "keywords": ["customer service", "administrative", "operations", "coordinator", "support"],
-  "cover_letter": "I am applying for this position with a versatile background in customer service, administration, and operations. I thrive in fast-paced environments and am dedicated to delivering excellent results."
+  "resume_file": "C:/Users/ual-laptop/Downloads/ABHISHEK KUMAR_Generative AI Engineer_20250905.pdf",
+  "full_name": "Abhishek Kumar",
+  "email": "abhisheknkp7291@gmail.com",
+  "phone": "5204769641",
+  "location": "CA, USA",
+  "linkedin": "",
+  "job_titles": [
+    "Data Scientist",
+    "Machine Learning Engineer",
+    "Generative AI Engineer",
+    "LLM Engineer",
+    "AI Engineer",
+    "MLOps Engineer",
+    "AI/ML Consultant"
+  ],
+  "keywords": ["data scientist", "machine learning engineer", "generative AI", "LLM engineer", "AI engineer", "MLOps"],
+  "years_experience": "5",
+  "cover_letter": "I am a Data Science Consultant with 5+ years of experience building end-to-end ML, AI, and LLM-driven systems. My work spans fine-tuning LLMs, multi-agent RAG pipelines processing 100K+ documents with 92% search accuracy, and production MLOps with Docker, AWS SageMaker, and MLflow. I hold AWS ML Specialty and GenAI certifications, and I would welcome the opportunity to contribute to your team."
 }

@@ -39,12 +39,15 @@ async def main():
     profile = load_profile(profile_name)
     print(f"{Fore.GREEN}Profile loaded: {profile['profile_name']}{Style.RESET_ALL}")
 
-    # Verify resume exists
-    resume_path = os.path.join(os.path.dirname(__file__), profile["resume_file"])
+    # Verify resume exists (supports absolute Windows paths or relative)
+    resume_path = profile["resume_file"]
+    if not os.path.isabs(resume_path):
+        resume_path = os.path.join(os.path.dirname(__file__), resume_path)
     if not os.path.exists(resume_path):
         print(f"{Fore.RED}Resume not found: {resume_path}{Style.RESET_ALL}")
-        print(f"Please place your resume at: {resume_path}")
+        print(f"Please update profiles/{profile_name}.json with the correct path.")
         sys.exit(1)
+    print(f"{Fore.GREEN}Resume: {resume_path}{Style.RESET_ALL}")
 
     # Choose site
     site = menu("Select job site to apply to:", ["CVS Health", "UHC (United Health Group)", "Both"])

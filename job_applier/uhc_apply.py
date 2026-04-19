@@ -2,8 +2,7 @@ import asyncio
 import os
 import logging
 from playwright.async_api import async_playwright, Page
-from config import EMAIL, PASSWORD, UHC_LOGIN_URL, BASE_DIR
-from resume_parser import extract_text, extract_phone, extract_name
+from config import EMAIL, PASSWORD, UHC_LOGIN_URL
 
 logger = logging.getLogger("uhc_apply")
 
@@ -34,21 +33,17 @@ async def login(page: Page):
     logger.info("Login attempted.")
 
 
-async def search_jobs(page: Page, keywords: list[str]):
-    logger.info(f"Searching UHC for: {keywords[0]}")
+async def search_jobs(page: Page, job_title: str):
+    logger.info(f"Searching UHC for: {job_title}")
     search_box = page.locator("input[placeholder*='Search'], input[aria-label*='keyword'], input[id*='search']")
     if await search_box.count() > 0:
-        await search_box.first.fill(keywords[0])
+        await search_box.first.fill(job_title)
         await page.keyboard.press("Enter")
         await page.wait_for_timeout(3000)
 
 
 async def apply_to_jobs(page: Page, profile: dict, max_jobs: int = 5):
-    resume_path = os.path.join(BASE_DIR, profile["resume_file"])
-    resume_text = extract_text(resume_path) if os.path.exists(resume_path) else ""
-    name = extract_name(resume_text)
-    phone = extract_phone(resume_text)
-
+    resume_path = profile["resume_file"]
     job_cards = page.locator("a[class*='job'], li[class*='job'], div[data-automation*='job']")
     count = min(await job_cards.count(), max_jobs)
     logger.info(f"Found {count} jobs to apply to on UHC.")
@@ -68,7 +63,7 @@ async def apply_to_jobs(page: Page, profile: dict, max_jobs: int = 5):
             await apply_btn.first.click()
             await page.wait_for_timeout(2000)
 
-            await _fill_application(page, profile, name, phone, resume_path)
+            await _fill_application(page, profile, resume_path)
             applied += 1
             logger.info(f"Applied to job {i + 1} on UHC.")
             await page.go_back()
@@ -79,20 +74,34 @@ async def apply_to_jobs(page: Page, profile: dict, max_jobs: int = 5):
     return applied
 
 
-async def _fill_application(page: Page, profile: dict, name: str, phone: str, resume_path: str):
-    name_field = page.locator("input[name*='name'], input[id*='name'], input[placeholder*='Name']")
-    if await name_field.count() > 0 and name:
-        await name_field.first.fill(name)
+async def _fill_application(page: Page, profile: dict, resume_path: str):
+    first_name, _, last_name = profile["full_name"].partition(" ")
 
-    email_field = page.locator("input[type='email'], input[name*='email']")
+    fn_field = page.locator("input[name*='first' i], input[id*='first' i], input[placeholder*='First' i]")
+    if await fn_field.count() > 0:
+        await fn_field.first.fill(first_name)
+
+    ln_field = page.locator("input[name*='last' i], input[id*='last' i], input[placeholder*='Last' i]")
+    if await ln_field.count() > 0:
+        await ln_field.first.fill(last_name)
+
+    name_field = page.locator("input[name*='name' i]:not([name*='first' i]):not([name*='last' i])")
+    if await name_field.count() > 0:
+        await name_field.first.fill(profile["full_name"])
+
+    email_field = page.locator("input[type='email'], input[name*='email' i]")
     if await email_field.count() > 0:
-        await email_field.first.fill(EMAIL)
+        await email_field.first.fill(profile["email"])
 
-    phone_field = page.locator("input[type='tel'], input[name*='phone']")
-    if await phone_field.count() > 0 and phone:
-        await phone_field.first.fill(phone)
+    phone_field = page.locator("input[type='tel'], input[name*='phone' i]")
+    if await phone_field.count() > 0:
+        await phone_field.first.fill(profile["phone"])
 
-    cover_field = page.locator("textarea[name*='cover'], textarea[id*='cover'], textarea[placeholder*='cover']")
+    loc_field = page.locator("input[name*='location' i], input[name*='city' i]")
+    if await loc_field.count() > 0:
+        await loc_field.first.fill(profile["location"])
+
+    cover_field = page.locator("textarea[name*='cover' i], textarea[id*='cover' i], textarea[placeholder*='cover' i]")
     if await cover_field.count() > 0:
         await cover_field.first.fill(profile["cover_letter"])
 
@@ -101,6 +110,8 @@ async def _fill_application(page: Page, profile: dict, name: str, phone: str, re
         if await upload.count() > 0:
             await upload.first.set_input_files(resume_path)
             await page.wait_for_timeout(1500)
+    else:
+        logger.warning(f"Resume not found: {resume_path}")
 
     submit = page.locator("button[type='submit']:has-text('Submit'), button:has-text('Submit Application')")
     if await submit.count() > 0:
@@ -115,8 +126,8 @@ async def run_uhc(profile: dict, max_jobs: int = 5, headless: bool = False):
         page = await context.new_page()
         try:
             await login(page)
-            await search_jobs(page, profile["keywords"])
-            applied = await apply_to_jobs(page, profile, max_jobs)
-            logger.info(f"UHC: Applied to {applied} jobs.")
+            for title in profile["job_titles"][:2]:
+                await search_jobs(page, title)
+                await apply_to_jobs(page, profile, max_jobs)
         finally:
             await browser.close()

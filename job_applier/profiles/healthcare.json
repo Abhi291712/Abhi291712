@@ -1,7 +1,20 @@
 {
   "profile_name": "Healthcare",
-  "resume_file": "resumes/healthcare_resume.pdf",
-  "job_titles": ["Healthcare Coordinator", "Medical Assistant", "Patient Care Specialist", "Clinical Support", "Health Services"],
-  "keywords": ["healthcare", "medical", "clinical", "patient care", "health"],
-  "cover_letter": "I am applying for this healthcare position with a strong background in patient care and health services. I am passionate about contributing to quality healthcare outcomes and working within a collaborative medical team."
+  "resume_file": "C:/Users/ual-laptop/Downloads/Abhishekcvs.pdf",
+  "full_name": "Abhishek Kumar",
+  "email": "abhisheknkp7291@gmail.com",
+  "phone": "5204769641",
+  "location": "CA, USA",
+  "linkedin": "",
+  "job_titles": [
+    "Healthcare Data Scientist",
+    "Clinical Data Scientist",
+    "Healthcare AI Engineer",
+    "Medical ML Engineer",
+    "Health Informatics Data Scientist",
+    "Clinical AI/ML Engineer"
+  ],
+  "keywords": ["healthcare data scientist", "clinical ML", "healthcare AI", "patient data", "medical machine learning"],
+  "years_experience": "5",
+  "cover_letter": "I am a Data Science Consultant with 5+ years of experience building scalable ML and LLM-driven solutions, including healthcare-focused work such as patient readmission prediction, OSCE-based clinical simulations with HIPAA/PHI guardrails, and fairness assessments on clinical models. My background in RAG pipelines, MLOps, and AWS/Databricks makes me well-suited to drive data-driven healthcare outcomes. I would welcome the opportunity to contribute to your team."
 }
