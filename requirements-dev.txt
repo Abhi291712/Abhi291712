@@ -1,0 +1,4 @@
+# Development and CI dependencies: runtime deps plus the test runner and linter.
+-r requirements.txt
+pytest==9.1.1
+ruff==0.16.9

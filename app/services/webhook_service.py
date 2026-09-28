@@ -1,0 +1,152 @@
+"""Webhook pipeline: store each event once, then apply it to the call record in the background.
+
+The work is split into two phases on purpose:
+
+1. ``record_event`` runs inside the HTTP request. It only stores the event (deduplicating by
+   ``event_id``) so the gateway can answer 200 within milliseconds. Voice platforms treat slow
+   webhook responses as failures and retry them, which would create even more load.
+2. ``process_event`` runs afterwards as a background task. It updates the call and never moves
+   its status backwards, because webhooks can arrive out of order (for example ``call_ended``
+   before ``call_started`` after a network retry).
+"""
+
+import logging
+
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, sessionmaker
+
+from app.models.call import STATUS_RANK, Call, CallStatus
+from app.models.event import Event, EventStatus, EventType
+from app.repositories.call_repo import CallRepository
+from app.repositories.event_repo import EventRepository
+from app.schemas.webhook import WebhookEvent
+
+logger = logging.getLogger(__name__)
+
+# The status each event type implies. An analysis only exists for a finished call.
+EVENT_TARGET_STATUS: dict[EventType, CallStatus] = {
+    EventType.CALL_STARTED: CallStatus.ONGOING,
+    EventType.CALL_ENDED: CallStatus.ENDED,
+    EventType.CALL_ANALYZED: CallStatus.ENDED,
+}
+
+UNKNOWN_AGENT = "unknown"
+
+
+class WebhookService:
+    def __init__(self, session: Session, calls: CallRepository, events: EventRepository) -> None:
+        self.session = session
+        self.calls = calls
+        self.events = events
+
+    def record_event(self, event: WebhookEvent) -> bool:
+        """Store the event. Returns False if this event_id was already stored (a duplicate)."""
+        if self.events.get_by_event_id(event.event_id):
+            logger.info("Duplicate webhook ignored", extra={"event_id": event.event_id})
+            return False
+
+        stored = Event(
+            event_id=event.event_id,
+            event_type=event.event_type,
+            call_external_id=event.call.call_id,
+            payload=event.model_dump(mode="json"),  # mode="json" makes datetimes serialisable.
+        )
+        try:
+            self.events.add(stored)
+            self.session.commit()
+        except IntegrityError:
+            # A concurrent delivery of the same event inserted it first.
+            self.session.rollback()
+            logger.info("Duplicate webhook ignored (race)", extra={"event_id": event.event_id})
+            return False
+
+        logger.info(
+            "Webhook received",
+            extra={"event_id": event.event_id, "event_type": str(event.event_type)},
+        )
+        return True
+
+    def process_event(self, event_id: str) -> None:
+        """Apply a stored event to its call. Failures are recorded on the event, not raised."""
+        stored = self.events.get_by_event_id(event_id)
+        if stored is None or stored.status == EventStatus.PROCESSED:
+            return
+
+        event = WebhookEvent.model_validate(stored.payload)
+        try:
+            try:
+                self._apply(event)
+            except IntegrityError:
+                # Another event for the same new call created the call row concurrently.
+                # Roll back and retry once; this time the call will be found and updated.
+                self.session.rollback()
+                self._apply(event)
+            self.events.mark_processed(stored)
+            self.session.commit()
+            logger.info("Webhook processed", extra={"event_id": event_id})
+        except Exception as exc:
+            self.session.rollback()
+            self.events.mark_failed(stored, repr(exc))
+            self.session.commit()
+            logger.exception("Webhook processing failed", extra={"event_id": event_id})
+
+    def _apply(self, event: WebhookEvent) -> None:
+        data = event.call
+        call = self.calls.get_by_external_id(data.call_id)
+        if call is None:
+            # First time we hear about this call (it was not created through POST /calls).
+            call = self.calls.add(
+                Call(
+                    external_call_id=data.call_id,
+                    agent_id=data.agent_id or UNKNOWN_AGENT,
+                    from_number=data.from_number,
+                    to_number=data.to_number,
+                    status=CallStatus.REGISTERED,
+                )
+            )
+
+        # Status only moves forward. A late call_started after call_ended is still useful for
+        # its timestamps, but it must not reopen a finished call.
+        target = EVENT_TARGET_STATUS[event.event_type]
+        current = CallStatus(call.status)
+        if STATUS_RANK[target] > STATUS_RANK[current]:
+            call.status = target
+        elif target != current:
+            logger.info(
+                "Out-of-order event: status change ignored",
+                extra={"event_id": event.event_id, "current": str(current), "event": str(target)},
+            )
+
+        # Fill in details without ever overwriting known values with missing ones.
+        if call.agent_id == UNKNOWN_AGENT and data.agent_id:
+            call.agent_id = data.agent_id
+        call.from_number = call.from_number or data.from_number
+        call.to_number = call.to_number or data.to_number
+
+        started_at = data.started_at
+        if started_at is None and event.event_type == EventType.CALL_STARTED:
+            started_at = event.occurred_at  # Fall back to the event time for call_started.
+        call.started_at = call.started_at or started_at
+        call.ended_at = call.ended_at or data.ended_at
+
+        # Analysis fields get richer over time, so newer non-empty values win.
+        if data.transcript:
+            call.transcript = data.transcript
+        if data.summary:
+            call.summary = data.summary
+        if data.sentiment:
+            call.sentiment = data.sentiment
+
+
+def build_webhook_service(session: Session) -> WebhookService:
+    return WebhookService(session, CallRepository(session), EventRepository(session))
+
+
+def process_event_in_background(session_factory: sessionmaker[Session], event_id: str) -> None:
+    """Entry point for FastAPI BackgroundTasks.
+
+    Runs after the response has been sent, when the request's database session is already
+    closed, so it opens (and closes) its own session.
+    """
+    with session_factory() as session:
+        build_webhook_service(session).process_event(event_id)

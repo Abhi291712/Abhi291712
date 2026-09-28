@@ -1,0 +1,18 @@
+# Virtual environments
+.venv/
+venv/
+
+# Local secrets and configuration
+.env
+
+# SQLite databases created by local runs and tests
+*.db
+*.db-journal
+
+# Python bytecode and tool caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/

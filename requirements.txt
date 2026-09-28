@@ -1,0 +1,10 @@
+# Runtime dependencies for voice-agent-gateway.
+# Versions are pinned so every environment (laptop, CI, Docker) runs identical code.
+fastapi==0.141.1
+uvicorn[standard]==0.54.0
+SQLAlchemy==2.1.1
+pydantic==2.13.5
+pydantic-settings==2.15.0
+httpx==0.28.1
+# PostgreSQL driver, only used when DATABASE_URL points at Postgres.
+psycopg[binary]==3.3.6
