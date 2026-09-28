@@ -1,1 +1,1 @@
-"""Test suite for voice-agent-gateway."""
+"""Test suite for voice-ai-backend."""

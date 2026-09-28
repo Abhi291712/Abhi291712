@@ -1,13 +1,13 @@
 """ORM model for webhook events received from the voice platform.
 
-Every webhook is stored before it is processed. This gives the gateway:
+Every webhook is stored before it is processed. This gives the service:
 
 * deduplication: ``event_id`` is unique, so a retried delivery is detected and ignored;
 * an audit trail: the raw payload is kept for debugging and replay;
 * visibility: ``status`` and ``error`` show whether background processing succeeded.
 
 Events reference calls by the platform's call ID (not a foreign key) because an event can
-arrive before the gateway has any record of that call.
+arrive before the service has any record of that call.
 """
 
 from datetime import datetime

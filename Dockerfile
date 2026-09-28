@@ -1,4 +1,4 @@
-# Container image for voice-agent-gateway.
+# Container image for voice-ai-backend.
 #
 # Uses a slim Python base to keep the image small, installs only runtime dependencies, and runs
 # the app as an unprivileged user so a compromised process cannot modify the system.
@@ -27,7 +27,7 @@ COPY app ./app
 RUN mkdir -p /app/data && chown -R app:app /app
 USER app
 
-ENV DATABASE_URL=sqlite:////app/data/voice_gateway.db
+ENV DATABASE_URL=sqlite:////app/data/voice_ai_backend.db
 EXPOSE 8000
 
 # Docker marks the container unhealthy if /health stops answering.

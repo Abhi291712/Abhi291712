@@ -3,7 +3,7 @@
 The work is split into two phases on purpose:
 
 1. ``record_event`` runs inside the HTTP request. It only stores the event (deduplicating by
-   ``event_id``) so the gateway can answer 200 within milliseconds. Voice platforms treat slow
+   ``event_id``) so the service can answer 200 within milliseconds. Voice platforms treat slow
    webhook responses as failures and retry them, which would create even more load.
 2. ``process_event`` runs afterwards as a background task. It updates the call and never moves
    its status backwards, because webhooks can arrive out of order (for example ``call_ended``

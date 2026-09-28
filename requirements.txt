@@ -1,4 +1,4 @@
-# Runtime dependencies for voice-agent-gateway.
+# Runtime dependencies for voice-ai-backend.
 # Versions are pinned so every environment (laptop, CI, Docker) runs identical code.
 fastapi==0.141.1
 uvicorn[standard]==0.54.0

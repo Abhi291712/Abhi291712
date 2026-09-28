@@ -19,13 +19,13 @@ class Settings(BaseSettings):
     # Read values from a local .env file if present; unknown variables are ignored.
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    app_name: str = "voice-agent-gateway"
+    app_name: str = "voice-ai-backend"
     environment: str = "development"
     log_level: str = "INFO"
     log_format: Literal["text", "json"] = "text"
 
     # SQLite works out of the box; any SQLAlchemy URL (e.g. Postgres) can be supplied instead.
-    database_url: str = "sqlite:///./voice_gateway.db"
+    database_url: str = "sqlite:///./voice_ai_backend.db"
 
     # Stored as a comma-separated string because that is the most natural format in a .env file.
     api_keys: str = "dev-key-1"

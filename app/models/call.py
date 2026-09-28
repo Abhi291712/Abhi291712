@@ -1,6 +1,6 @@
 """ORM model for a phone call handled by a voice agent, plus the call status rules.
 
-A ``Call`` row is the central record of the gateway. It can be created by an API client
+A ``Call`` row is the central record of the service. It can be created by an API client
 (``POST /calls``) or implicitly by the first webhook the voice platform sends about a call.
 The status rules live next to the model because both the API and the webhook pipeline rely on
 them, and keeping them in one place prevents the two paths from drifting apart.

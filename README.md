@@ -1,4 +1,4 @@
-# voice-agent-gateway
+# voice-ai-backend
 
 A production-style FastAPI backend that connects **voice AI agents** (such as [Retell AI](https://www.retellai.com/)) to **business systems**.
 
@@ -123,7 +123,7 @@ All settings come from environment variables or a `.env` file. See [`.env.exampl
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `DATABASE_URL` | `sqlite:///./voice_gateway.db` | Any SQLAlchemy URL, e.g. `postgresql+psycopg://...` |
+| `DATABASE_URL` | `sqlite:///./voice_ai_backend.db` | Any SQLAlchemy URL, e.g. `postgresql+psycopg://...` |
 | `API_KEYS` | `dev-key-1` | Comma-separated keys accepted in `X-API-Key` |
 | `WEBHOOK_SECRET` | `change-me-webhook-secret` | Shared secret for webhook HMAC signatures |
 | `RATE_LIMIT_CAPACITY` | `60` | Burst size per API key |
@@ -229,9 +229,9 @@ Each test gets its own temporary SQLite database, so tests are isolated from eac
 
 **Idempotency keys.** Networks fail after a request is processed but before the response arrives, so clients retry. The `Idempotency-Key` header is stored with the call (under a unique constraint) together with a hash of the request body. A retry with the same key and body returns the original call; the same key with a different body returns `422`, because that is a client bug, not a retry. The unique constraint also resolves the race where two identical requests arrive at the same moment.
 
-**HMAC webhook signatures.** The webhook URL is public, so anyone could post fake events. The platform signs each body with a shared secret; the gateway recomputes HMAC-SHA256 over the *raw* bytes (re-serialised JSON could differ) and compares with `hmac.compare_digest` to avoid timing attacks.
+**HMAC webhook signatures.** The webhook URL is public, so anyone could post fake events. The platform signs each body with a shared secret; the service recomputes HMAC-SHA256 over the *raw* bytes (re-serialised JSON could differ) and compares with `hmac.compare_digest` to avoid timing attacks.
 
-**Store first, process later.** Webhook senders retry when a response is slow. The gateway only stores the event (with `event_id` as a unique key for deduplication) and answers `200`, then applies it in a background task. Because events can arrive out of order, statuses have a rank and can only move forward; later events still fill in missing timestamps and analysis.
+**Store first, process later.** Webhook senders retry when a response is slow. The service only stores the event (with `event_id` as a unique key for deduplication) and answers `200`, then applies it in a background task. Because events can arrive out of order, statuses have a rank and can only move forward; later events still fill in missing timestamps and analysis.
 
 **Retries with backoff and jitter.** The outbound client retries only failures that can succeed on a second try (timeouts, connection errors, `429`, `5xx`). Delays grow exponentially, include random jitter so many clients do not retry in lock-step, and honour `Retry-After` when the server sends it. Other `4xx` errors fail immediately.
 

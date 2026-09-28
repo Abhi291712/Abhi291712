@@ -4,13 +4,13 @@ This document provides guidance for AI assistants (like Claude) working with thi
 
 ## Repository Overview
 
-**Repository:** Abhi291712/Abhi291712
-**Status:** Active - voice-agent-gateway FastAPI service
+**Repository:** Abhi291712/voice-ai-backend
+**Status:** Active - voice-ai-backend FastAPI service
 **Last Updated:** 2026-09-28
 
 ### Purpose
 
-voice-agent-gateway: a FastAPI backend connecting voice AI agents (e.g. Retell AI) to business systems. It manages call records, processes signed call webhooks, and exposes tool endpoints voice agents call mid-conversation. See README.md and docs/LEARN.md.
+voice-ai-backend: a FastAPI backend connecting voice AI agents (e.g. Retell AI) to business systems. It manages call records, processes signed call webhooks, and exposes tool endpoints voice agents call mid-conversation. See README.md and docs/LEARN.md.
 
 ### Technology Stack
 
@@ -327,7 +327,7 @@ This document should be updated when:
 ### Document History
 
 - **2025-12-05**: Initial creation - Repository setup and template structure
-- **2026-09-28**: Added voice-agent-gateway; filled in stack, test and build commands. Layering rule: routers = HTTP only, services = business logic, repositories = DB access; every file starts with an explanatory docstring.
+- **2026-09-28**: Added voice-ai-backend; filled in stack, test and build commands. Layering rule: routers = HTTP only, services = business logic, repositories = DB access; every file starts with an explanatory docstring.
 
 ---
 

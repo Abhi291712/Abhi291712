@@ -1,4 +1,4 @@
-# Tool configuration for voice-agent-gateway (linting and tests).
+# Tool configuration for voice-ai-backend (linting and tests).
 # Dependencies are managed in requirements.txt / requirements-dev.txt.
 
 [tool.ruff]

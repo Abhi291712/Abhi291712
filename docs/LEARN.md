@@ -1,4 +1,4 @@
-# Learning guide: how voice-agent-gateway works
+# Learning guide: how voice-ai-backend works
 
 This guide explains the project in plain language, then follows two real requests through every file they touch. Keep the code open next to it; the file and function names below match the source exactly.
 
@@ -166,7 +166,7 @@ The router calls `WebhookEvent.model_validate_json(body)` (**`app/schemas/webhoo
 
 1. Loads the stored event; skips it if already processed.
 2. `_apply(event)`:
-   1. `calls.get_by_external_id("call_abc")`. If the gateway has never seen this call, it creates it.
+   1. `calls.get_by_external_id("call_abc")`. If the service has never seen this call, it creates it.
    2. Looks up the target status: `call_ended` means `ended` (`EVENT_TARGET_STATUS`).
    3. **Out-of-order protection**: compares `STATUS_RANK` from **`app/models/call.py`**. The status only changes if the new rank is higher. So if `call_started` arrives *after* `call_ended`, the call stays `ended`.
    4. Fills in missing details (timestamps, numbers) without overwriting known values with empty ones, and stores transcript, summary and sentiment when present.

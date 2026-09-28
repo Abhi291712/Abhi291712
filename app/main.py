@@ -24,7 +24,7 @@ from app.routers import calls, health, tools, webhooks
 logger = logging.getLogger(__name__)
 
 DESCRIPTION = """
-Backend gateway between voice AI agents (such as Retell AI) and business systems.
+Backend service connecting voice AI agents (such as Retell AI) to business systems.
 
 * **Calls**: create, list, fetch and update call records (`X-API-Key` required).
 * **Webhooks**: signed call lifecycle events from the voice platform.

@@ -54,7 +54,7 @@ class JsonFormatter(logging.Formatter):
 def configure_logging(level: str = "INFO", fmt: str = "text") -> None:
     """Configure the root logger once at startup."""
     handler = logging.StreamHandler(sys.stdout)
-    handler._gateway_handler = True  # type: ignore[attr-defined]  # Marks handlers we own.
+    handler._app_handler = True  # type: ignore[attr-defined]  # Marks handlers we own.
     if fmt == "json":
         handler.setFormatter(JsonFormatter())
     else:
@@ -68,7 +68,7 @@ def configure_logging(level: str = "INFO", fmt: str = "text") -> None:
     root = logging.getLogger()
     # Replace only our own handler, so calling this twice (e.g. in tests) never duplicates
     # log lines and handlers added by other tools (such as pytest) are left alone.
-    for existing in [h for h in root.handlers if getattr(h, "_gateway_handler", False)]:
+    for existing in [h for h in root.handlers if getattr(h, "_app_handler", False)]:
         root.removeHandler(existing)
     root.addHandler(handler)
     root.setLevel(level.upper())

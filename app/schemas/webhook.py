@@ -3,7 +3,7 @@
 The payload shape is modelled on typical voice AI platforms such as Retell AI: an event type,
 a unique event ID, and a ``call`` object whose fields fill in over the life of the call
 (a transcript only exists after the call ends, an analysis only after it is analysed).
-Unknown fields are ignored so the platform can add fields without breaking the gateway.
+Unknown fields are ignored so the platform can add fields without breaking the service.
 """
 
 from datetime import datetime
