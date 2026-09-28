@@ -4,7 +4,9 @@ Every webhook is stored before it is processed. This gives the service:
 
 * deduplication: ``event_id`` is unique, so a retried delivery is detected and ignored;
 * an audit trail: the raw payload is kept for debugging and replay;
-* visibility: ``status`` and ``error`` show whether background processing succeeded.
+* visibility: ``status`` and ``error`` show whether background processing succeeded;
+* durability: events that were stored but never processed (for example because the server
+  restarted) or that failed are picked up again by the retry sweeper, up to ``attempts`` limit.
 
 Events reference calls by the platform's call ID (not a foreign key) because an event can
 arrive before the service has any record of that call.
@@ -40,7 +42,9 @@ class Event(Base):
     event_type: Mapped[str] = mapped_column(String(32))
     call_external_id: Mapped[str] = mapped_column(String(128), index=True)
     payload: Mapped[dict] = mapped_column(JSON)
-    status: Mapped[str] = mapped_column(String(16), default=EventStatus.RECEIVED)
+    status: Mapped[str] = mapped_column(String(16), default=EventStatus.RECEIVED, index=True)
+    # How many times processing has been attempted; the retry sweeper stops at a maximum.
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str | None] = mapped_column(Text)
     received_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     processed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)

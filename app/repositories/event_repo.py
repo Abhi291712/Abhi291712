@@ -6,7 +6,9 @@ Relying on the database (instead of a check-then-insert in Python) is what makes
 the platform retries a delivery while the first one is still being handled.
 """
 
-from sqlalchemy import select
+from datetime import datetime
+
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.database import utcnow
@@ -30,6 +32,31 @@ class EventRepository:
             select(Event)
             .where(Event.call_external_id == call_external_id)
             .order_by(Event.received_at, Event.id)
+        )
+        return list(self.session.scalars(query))
+
+    def list_retryable(
+        self, *, older_than: datetime, max_attempts: int, limit: int = 100
+    ) -> list[Event]:
+        """Events that need (another) processing attempt.
+
+        * ``received`` events older than the cutoff: stored, but the background task never ran
+          (for example the process restarted between storing and processing).
+        * ``failed`` events whose last attempt is older than the cutoff: retried after a pause.
+
+        Events that reached ``max_attempts`` are left alone (a "dead letter" for manual review).
+        """
+        query = (
+            select(Event)
+            .where(
+                Event.attempts < max_attempts,
+                or_(
+                    and_(Event.status == EventStatus.RECEIVED, Event.received_at < older_than),
+                    and_(Event.status == EventStatus.FAILED, Event.processed_at < older_than),
+                ),
+            )
+            .order_by(Event.received_at, Event.id)  # Oldest first keeps calls roughly in order.
+            .limit(limit)
         )
         return list(self.session.scalars(query))
 

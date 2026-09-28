@@ -9,14 +9,25 @@ from collections.abc import Iterator
 from datetime import UTC, datetime
 
 from fastapi import Request
-from sqlalchemy import DateTime, Engine, create_engine, text
+from sqlalchemy import DateTime, Engine, MetaData, create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy.types import TypeDecorator
 
 
 class Base(DeclarativeBase):
-    """Base class for all ORM models; collects table metadata for create_all()."""
+    """Base class for all ORM models; collects table metadata for migrations and create_all()."""
+
+    # Predictable constraint names ("uq_calls_idempotency_key" instead of a random name chosen
+    # by the database) let Alembic migrations refer to, alter and drop constraints reliably.
+    metadata = MetaData(
+        naming_convention={
+            "ix": "ix_%(column_0_label)s",
+            "uq": "uq_%(table_name)s_%(column_0_name)s",
+            "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+            "pk": "pk_%(table_name)s",
+        }
+    )
 
 
 def utcnow() -> datetime:
@@ -64,7 +75,8 @@ def build_session_factory(engine: Engine) -> sessionmaker[Session]:
 
 
 def init_db(engine: Engine) -> None:
-    """Create all tables that do not exist yet (a migration tool would replace this later)."""
+    """Create all tables that do not exist yet. Used in development and tests only;
+    production applies the Alembic migrations in `migrations/` instead."""
     # Import models so their tables are registered on Base.metadata before create_all runs.
     from app.models import appointment, call, event  # noqa: F401
 

@@ -11,10 +11,12 @@ The work is split into two phases on purpose:
 """
 
 import logging
+from datetime import timedelta
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.core.database import utcnow
 from app.models.call import STATUS_RANK, Call, CallStatus
 from app.models.event import Event, EventStatus, EventType
 from app.repositories.call_repo import CallRepository
@@ -73,6 +75,9 @@ class WebhookService:
             return
 
         event = WebhookEvent.model_validate(stored.payload)
+        # Counted on every attempt so the retry sweeper can give up on an event that keeps
+        # failing. It is assigned just before each commit because a rollback discards it.
+        attempt = (stored.attempts or 0) + 1
         try:
             try:
                 self._apply(event)
@@ -81,11 +86,13 @@ class WebhookService:
                 # Roll back and retry once; this time the call will be found and updated.
                 self.session.rollback()
                 self._apply(event)
+            stored.attempts = attempt
             self.events.mark_processed(stored)
             self.session.commit()
             logger.info("Webhook processed", extra={"event_id": event_id})
         except Exception as exc:
             self.session.rollback()
+            stored.attempts = attempt
             self.events.mark_failed(stored, repr(exc))
             self.session.commit()
             logger.exception("Webhook processing failed", extra={"event_id": event_id})
@@ -140,6 +147,30 @@ class WebhookService:
 
 def build_webhook_service(session: Session) -> WebhookService:
     return WebhookService(session, CallRepository(session), EventRepository(session))
+
+
+def reprocess_pending_events(
+    session_factory: sessionmaker[Session], *, min_age_seconds: float, max_attempts: int
+) -> int:
+    """Retry events that were never processed or that failed. Returns how many were attempted.
+
+    Called periodically by the sweeper started in `app.main`. Because every event is stored
+    before it is processed, a crash or restart can delay processing but never lose an event.
+    """
+    cutoff = utcnow() - timedelta(seconds=min_age_seconds)
+    with session_factory() as session:
+        event_ids = [
+            e.event_id
+            for e in EventRepository(session).list_retryable(
+                older_than=cutoff, max_attempts=max_attempts
+            )
+        ]
+    for event_id in event_ids:
+        # A fresh session per event, so one bad event cannot affect the others.
+        process_event_in_background(session_factory, event_id)
+    if event_ids:
+        logger.info("Retried pending webhook events", extra={"count": len(event_ids)})
+    return len(event_ids)
 
 
 def process_event_in_background(session_factory: sessionmaker[Session], event_id: str) -> None:

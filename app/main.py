@@ -6,6 +6,8 @@ test database. Nothing is created at import time except the default ``app`` obje
 serves via ``uvicorn app.main:app``.
 """
 
+import asyncio
+import contextlib
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -20,6 +22,7 @@ from app.core.logging import configure_logging
 from app.middleware.rate_limit import RateLimiter, RateLimitMiddleware
 from app.middleware.request_id import RequestIdMiddleware
 from app.routers import calls, health, tools, webhooks
+from app.services.event_sweeper import run_event_sweeper
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +43,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        # Startup: make sure tables exist. Shutdown: close pooled DB connections cleanly.
-        init_db(engine)
+        # Startup. In production the schema comes from `alembic upgrade head` instead.
+        if settings.auto_create_tables:
+            init_db(engine)
+        sweeper = None
+        if settings.event_retry_interval_seconds > 0:
+            sweeper = asyncio.create_task(
+                run_event_sweeper(app.state.session_factory, settings), name="event-sweeper"
+            )
         logger.info("Application started", extra={"environment": settings.environment})
         yield
+        # Shutdown: stop the sweeper, then close pooled DB connections cleanly.
+        if sweeper:
+            sweeper.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await sweeper
         engine.dispose()
 
     app = FastAPI(

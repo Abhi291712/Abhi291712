@@ -26,4 +26,6 @@ class Appointment(Base):
     end_time: Mapped[datetime] = mapped_column(UTCDateTime)
     # Optional link to the call during which the appointment was booked.
     call_id: Mapped[str | None] = mapped_column(ForeignKey("calls.id"), index=True)
+    # ID of the matching Google Calendar event, once the booking has been synced.
+    calendar_event_id: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

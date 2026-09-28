@@ -1,0 +1,5 @@
+Database migrations managed by Alembic.
+
+Each file in versions/ is one schema change, applied in order by `alembic upgrade head`.
+After changing a model in app/models/, run `alembic revision --autogenerate -m "describe it"`,
+review the generated file, and commit it together with the model change.

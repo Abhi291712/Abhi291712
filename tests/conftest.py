@@ -44,6 +44,7 @@ def settings(tmp_path) -> Settings:
         business_open_hour=9,
         business_close_hour=17,
         appointment_slot_minutes=30,
+        event_retry_interval_seconds=0,  # Sweeper off; tests call reprocessing directly.
     )
 
 
