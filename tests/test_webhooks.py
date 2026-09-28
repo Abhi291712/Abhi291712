@@ -5,6 +5,7 @@ assertion runs the event has already been processed.
 """
 
 import json
+import time
 
 from sqlalchemy import func, select
 
@@ -62,6 +63,27 @@ def test_tampered_body_fails_signature(client):
     tampered = original.replace(b"call_started", b"call_ended")
 
     response = client.post("/webhooks/voice", content=tampered, headers=sign(original))
+
+    assert response.status_code == 401
+
+
+def test_replayed_old_webhook_returns_401(client):
+    # A correctly signed request captured 10 minutes ago must not be accepted again.
+    body = b'{"event_id":"e1","event_type":"call_started","call":{"call_id":"x"}}'
+    stale = int(time.time()) - 600
+
+    response = client.post("/webhooks/voice", content=body, headers=sign(body, timestamp=stale))
+
+    assert response.status_code == 401
+
+
+def test_timestamp_is_part_of_the_signature(client):
+    # Swapping in a fresh timestamp without re-signing must fail too.
+    body = b'{"event_id":"e1","event_type":"call_started","call":{"call_id":"x"}}'
+    headers = sign(body, timestamp=int(time.time()) - 600)
+    headers["X-Webhook-Timestamp"] = str(int(time.time()))
+
+    response = client.post("/webhooks/voice", content=body, headers=headers)
 
     assert response.status_code == 401
 

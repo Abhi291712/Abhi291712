@@ -18,14 +18,16 @@ class AvailabilityRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")  # Agents often send extra context; ignore it.
 
     # `dt.date` (not `date`) avoids a name clash between the field and its type.
-    date: dt.date = Field(description="Day to check, YYYY-MM-DD (UTC).")
+    date: dt.date = Field(description="Day to check, YYYY-MM-DD, in the business time zone.")
     call_id: str | None = Field(default=None, description="Platform call ID, for logging.")
 
 
 class AvailabilityResponse(BaseModel):
     available: bool
     date: dt.date
-    slots: list[dt.datetime] = Field(description="Start times of all free slots on that day.")
+    slots: list[dt.datetime] = Field(
+        description="Start times of all free slots that day, in the business time zone."
+    )
     message: str = Field(description="Sentence the voice agent can speak to the caller.")
 
 
@@ -36,7 +38,9 @@ class BookingRequest(BaseModel):
 
     customer_name: str = Field(min_length=1, max_length=100)
     customer_phone: str = Field(pattern=E164_PATTERN)
-    start_time: dt.datetime = Field(description="Slot start, ISO 8601. Naive values mean UTC.")
+    start_time: dt.datetime = Field(
+        description="Slot start, ISO 8601. Values without an offset are business-local time."
+    )
     call_id: str | None = Field(
         default=None, description="Platform call ID, used to link the booking to the call."
     )

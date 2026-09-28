@@ -6,6 +6,7 @@ touch the development database and cannot affect each other. The app is built th
 """
 
 import json
+import time
 import uuid
 from collections.abc import Callable, Iterator
 from datetime import UTC, date, datetime, timedelta
@@ -92,10 +93,12 @@ def create_call(client: TestClient, auth_headers: dict, call_payload: dict) -> C
     return _create
 
 
-def sign(body: bytes, secret: str = WEBHOOK_SECRET) -> dict[str, str]:
-    """Headers for a correctly signed webhook request."""
+def sign(body: bytes, secret: str = WEBHOOK_SECRET, timestamp: int | None = None) -> dict:
+    """Headers for a correctly signed (and, by default, fresh) webhook request."""
+    ts = str(int(time.time()) if timestamp is None else timestamp)
     return {
-        "X-Signature": f"sha256={compute_signature(body, secret)}",
+        "X-Webhook-Timestamp": ts,
+        "X-Signature": f"sha256={compute_signature(body, ts, secret)}",
         "Content-Type": "application/json",
     }
 

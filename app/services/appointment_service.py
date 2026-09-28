@@ -2,14 +2,16 @@
 
 A voice agent is in a live conversation while it waits for these responses, so this service
 does only a couple of indexed queries per request and always produces a ready-to-speak
-``message``. Business rules (opening hours, slot length) come from configuration.
+``message``. Business rules (opening hours, slot length, time zone) come from configuration.
 
-All times are UTC. Slots are fixed-length and aligned to the opening hour, so a requested
-start time is valid exactly when it appears in the list of generated slots for that day.
+Time zones: opening hours are defined in the business's local time (``BUSINESS_TIMEZONE``).
+Slots are generated in local time, stored in the database as UTC, and returned and spoken in
+local time. Slots are fixed-length and aligned to the opening hour, so a requested start time
+is valid exactly when it appears in the list of generated slots for that day.
 """
 
 import logging
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta, tzinfo
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -49,9 +51,9 @@ def join_spoken(parts: list[str]) -> str:
     return ", ".join(parts[:-1]) + " and " + parts[-1]
 
 
-def as_utc(moment: datetime) -> datetime:
-    """Interpret naive datetimes as UTC and convert aware ones to UTC."""
-    return moment.replace(tzinfo=UTC) if moment.tzinfo is None else moment.astimezone(UTC)
+def to_local(moment: datetime, tz: tzinfo) -> datetime:
+    """Interpret naive datetimes as business-local time; convert aware ones to local time."""
+    return moment.replace(tzinfo=tz) if moment.tzinfo is None else moment.astimezone(tz)
 
 
 class AppointmentService:
@@ -71,10 +73,14 @@ class AppointmentService:
     def slot_length(self) -> timedelta:
         return timedelta(minutes=self.settings.appointment_slot_minutes)
 
+    @property
+    def tz(self) -> tzinfo:
+        return self.settings.tz
+
     def slots_for_day(self, day: date) -> list[datetime]:
-        """Every slot start time within opening hours on `day`."""
-        start = datetime.combine(day, time(self.settings.business_open_hour), tzinfo=UTC)
-        close = datetime.combine(day, time(), tzinfo=UTC) + timedelta(
+        """Every slot start time within opening hours on the local `day`, in local time."""
+        start = datetime.combine(day, time(self.settings.business_open_hour), tzinfo=self.tz)
+        close = datetime.combine(day, time(), tzinfo=self.tz) + timedelta(
             hours=self.settings.business_close_hour
         )
         slots = []
@@ -83,15 +89,26 @@ class AppointmentService:
             start += self.slot_length
         return slots
 
+    def _day_bounds_utc(self, day: date) -> tuple[datetime, datetime]:
+        """Start and end of the local `day`, converted to UTC for database queries."""
+        start = datetime.combine(day, time(), tzinfo=self.tz)
+        end = datetime.combine(day + timedelta(days=1), time(), tzinfo=self.tz)
+        return start.astimezone(UTC), end.astimezone(UTC)
+
+    def booked_starts(self, day: date) -> set[datetime]:
+        """UTC start times already taken on the local `day`."""
+        return {a.start_time for a in self.appointments.list_between(*self._day_bounds_utc(day))}
+
     def free_slots(self, day: date) -> list[datetime]:
-        """Slots on `day` that are in the future and not yet booked."""
-        day_start = datetime.combine(day, time(), tzinfo=UTC)
-        booked = {
-            a.start_time
-            for a in self.appointments.list_between(day_start, day_start + timedelta(days=1))
-        }
+        """Slots on `day` that are in the future and not yet booked (local time)."""
+        booked = self.booked_starts(day)
         now = utcnow()
-        return [slot for slot in self.slots_for_day(day) if slot > now and slot not in booked]
+        return [
+            slot
+            for slot in self.slots_for_day(day)
+            # Aware datetimes compare correctly across time zones, so local vs UTC is fine.
+            if slot > now and slot.astimezone(UTC) not in booked
+        ]
 
     def check_availability(self, request: AvailabilityRequest) -> AvailabilityResponse:
         free = self.free_slots(request.date)
@@ -107,7 +124,7 @@ class AppointmentService:
         )
 
     def book(self, request: BookingRequest) -> BookingResponse:
-        start = as_utc(request.start_time)
+        start = to_local(request.start_time, self.tz)
 
         if start <= utcnow():
             raise UnprocessableError(
@@ -122,7 +139,7 @@ class AppointmentService:
                 "Could you pick one of those times?",
                 code="INVALID_SLOT",
             )
-        if self.appointments.get_by_start_time(start):
+        if self.appointments.get_by_start_time(start.astimezone(UTC)):
             raise self._slot_taken(start)
 
         # Link the booking to the call record when the agent passes the platform call ID.
@@ -130,8 +147,8 @@ class AppointmentService:
         appointment = Appointment(
             customer_name=request.customer_name,
             customer_phone=request.customer_phone,
-            start_time=start,
-            end_time=start + self.slot_length,
+            start_time=start.astimezone(UTC),  # The database always stores UTC.
+            end_time=(start + self.slot_length).astimezone(UTC),
             call_id=call.id if call else None,
         )
         try:
@@ -146,8 +163,8 @@ class AppointmentService:
         first_name = request.customer_name.split()[0]
         return BookingResponse(
             appointment_id=appointment.id,
-            start_time=appointment.start_time,
-            end_time=appointment.end_time,
+            start_time=start,
+            end_time=start + self.slot_length,
             message=(
                 f"You're all set, {first_name}! Your appointment is booked for "
                 f"{speak_day(start.date())} at {speak_time(start)}."
