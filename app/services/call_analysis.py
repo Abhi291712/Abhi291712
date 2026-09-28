@@ -25,6 +25,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
+from app.core import metrics
 from app.core.config import Settings
 from app.models.call import Call
 
@@ -154,7 +155,9 @@ def analyze_call(session: Session, call: Call, analyzer: CallAnalyzer) -> CallAn
         return None
     result = analyzer.analyze(call.transcript)
     if result is None:
+        metrics.LLM_ANALYSES.labels("unusable").inc()
         return None
+    metrics.LLM_ANALYSES.labels("success").inc()
     call.analysis = result.model_dump()
     call.summary = call.summary or result.summary
     call.sentiment = call.sentiment or result.sentiment

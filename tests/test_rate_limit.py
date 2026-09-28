@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import create_app
-from app.middleware.rate_limit import RateLimiter
+from app.middleware.rate_limit import RateLimiter, RedisRateLimiter
 from tests.conftest import OTHER_API_KEY, TEST_API_KEY
 
 
@@ -18,33 +18,36 @@ class FakeClock:
         return self.now
 
 
-def test_bucket_allows_burst_then_blocks():
+@pytest.mark.anyio
+async def test_bucket_allows_burst_then_blocks():
     limiter = RateLimiter(capacity=3, refill_rate=1.0, clock=FakeClock())
 
-    results = [limiter.acquire("k")[0] for _ in range(4)]
+    results = [(await limiter.acquire("k"))[0] for _ in range(4)]
 
     assert results == [True, True, True, False]
 
 
-def test_bucket_refills_over_time():
+@pytest.mark.anyio
+async def test_bucket_refills_over_time():
     clock = FakeClock()
     limiter = RateLimiter(capacity=2, refill_rate=0.5, clock=clock)  # One token every 2 seconds.
-    limiter.acquire("k")
-    limiter.acquire("k")
+    await limiter.acquire("k")
+    await limiter.acquire("k")
 
-    allowed, wait = limiter.acquire("k")
+    allowed, wait = await limiter.acquire("k")
     assert not allowed and wait == pytest.approx(2.0)
 
     clock.now += 2.0
-    assert limiter.acquire("k")[0] is True
+    assert (await limiter.acquire("k"))[0] is True
 
 
-def test_bucket_never_exceeds_capacity():
+@pytest.mark.anyio
+async def test_bucket_never_exceeds_capacity():
     clock = FakeClock()
     limiter = RateLimiter(capacity=2, refill_rate=10.0, clock=clock)
     clock.now += 1000  # A long idle period must not bank thousands of tokens.
 
-    results = [limiter.acquire("k")[0] for _ in range(3)]
+    results = [(await limiter.acquire("k"))[0] for _ in range(3)]
 
     assert results == [True, True, False]
 
@@ -104,3 +107,75 @@ def test_invalid_keys_are_not_rate_limited_but_rejected(limited_client):
 def test_health_is_not_rate_limited(limited_client):
     statuses = [limited_client.get("/health").status_code for _ in range(5)]
     assert statuses == [200] * 5
+
+
+# ---------- Redis backend (fakeredis runs the real Lua script in-process) ----------
+
+
+@pytest.fixture
+def fake_redis():
+    import fakeredis
+
+    return fakeredis.FakeAsyncRedis()
+
+
+@pytest.mark.anyio
+async def test_redis_bucket_allows_burst_then_blocks(fake_redis):
+    clock = FakeClock()
+    limiter = RedisRateLimiter(fake_redis, capacity=3, refill_rate=1.0, clock=clock)
+
+    results = [(await limiter.acquire("k"))[0] for _ in range(4)]
+
+    assert results == [True, True, True, False]
+
+
+@pytest.mark.anyio
+async def test_redis_bucket_refills_and_reports_wait(fake_redis):
+    clock = FakeClock()
+    limiter = RedisRateLimiter(fake_redis, capacity=1, refill_rate=0.5, clock=clock)
+    await limiter.acquire("k")
+
+    allowed, wait = await limiter.acquire("k")
+    assert not allowed and wait == pytest.approx(2.0)
+
+    clock.now += 2.0
+    assert (await limiter.acquire("k"))[0] is True
+
+
+@pytest.mark.anyio
+async def test_redis_buckets_are_shared_between_instances(fake_redis):
+    # Two app instances pointing at the same Redis spend the same tokens.
+    clock = FakeClock()
+    instance_a = RedisRateLimiter(fake_redis, capacity=2, refill_rate=0.001, clock=clock)
+    instance_b = RedisRateLimiter(fake_redis, capacity=2, refill_rate=0.001, clock=clock)
+
+    results = [
+        (await instance_a.acquire("k"))[0],
+        (await instance_b.acquire("k"))[0],
+        (await instance_a.acquire("k"))[0],
+    ]
+
+    assert results == [True, True, False]
+
+
+@pytest.mark.anyio
+async def test_redis_key_is_hashed(fake_redis):
+    limiter = RedisRateLimiter(fake_redis, capacity=2, refill_rate=1.0)
+    await limiter.acquire("secret-api-key")
+
+    keys = [key.decode() for key in await fake_redis.keys("*")]
+    assert keys and all("secret-api-key" not in key for key in keys)
+
+
+@pytest.mark.anyio
+async def test_redis_outage_fails_open():
+    class BrokenRedis:
+        def register_script(self, _):
+            async def run(**_kwargs):
+                raise ConnectionError("redis down")
+
+            return run
+
+    limiter = RedisRateLimiter(BrokenRedis(), capacity=1, refill_rate=1.0)
+
+    assert (await limiter.acquire("k")) == (True, 0.0)

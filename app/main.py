@@ -19,9 +19,11 @@ from app.core.config import Settings, get_settings
 from app.core.database import build_engine, build_session_factory, init_db
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
-from app.middleware.rate_limit import RateLimiter, RateLimitMiddleware
+from app.core.tracing import setup_tracing
+from app.middleware.metrics import MetricsMiddleware
+from app.middleware.rate_limit import RateLimitMiddleware, build_limiter
 from app.middleware.request_id import RequestIdMiddleware
-from app.routers import calls, health, retell, tools, webhooks
+from app.routers import calls, health, metrics, retell, tools, webhooks
 from app.services.call_analysis import CallAnalyzer
 from app.services.event_sweeper import run_event_sweeper
 
@@ -76,13 +78,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     register_exception_handlers(app)
 
-    # Middleware added last runs first. RequestIdMiddleware is outermost so that even
-    # responses produced by the rate limiter carry an X-Request-ID and are logged.
+    # Middleware added last runs first, so the order below is innermost -> outermost:
+    #   RequestId (outermost: every log line, even for 429s, has an ID)
+    #   -> Metrics (counts every response, including rate-limited ones)
+    #   -> RateLimit -> routes
     app.add_middleware(
         RateLimitMiddleware,
-        limiter=RateLimiter(settings.rate_limit_capacity, settings.rate_limit_refill_per_second),
+        limiter=build_limiter(
+            settings.rate_limit_capacity,
+            settings.rate_limit_refill_per_second,
+            settings.redis_url,
+        ),
         api_keys=settings.api_key_set,
     )
+    app.add_middleware(MetricsMiddleware, tool_latency_budget_ms=settings.tool_latency_budget_ms)
     app.add_middleware(RequestIdMiddleware)
 
     app.include_router(health.router)
@@ -90,6 +99,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(webhooks.router)
     app.include_router(tools.router)
     app.include_router(retell.router)
+    if settings.metrics_enabled:
+        app.include_router(metrics.router)
+
+    setup_tracing(app, settings)
     return app
 
 

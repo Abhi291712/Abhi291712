@@ -16,6 +16,7 @@ from datetime import timedelta
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.core import metrics
 from app.core.database import utcnow
 from app.models.call import STATUS_RANK, Call, CallStatus
 from app.models.event import Event, EventStatus, EventType
@@ -49,6 +50,7 @@ class WebhookService:
         """Store the event. Returns False if this event_id was already stored (a duplicate)."""
         if self.events.get_by_event_id(event.event_id):
             logger.info("Duplicate webhook ignored", extra={"event_id": event.event_id})
+            metrics.WEBHOOK_EVENTS.labels(event.event_type, "duplicate").inc()
             return False
 
         stored = Event(
@@ -64,8 +66,10 @@ class WebhookService:
             # A concurrent delivery of the same event inserted it first.
             self.session.rollback()
             logger.info("Duplicate webhook ignored (race)", extra={"event_id": event.event_id})
+            metrics.WEBHOOK_EVENTS.labels(event.event_type, "duplicate").inc()
             return False
 
+        metrics.WEBHOOK_EVENTS.labels(event.event_type, "received").inc()
         logger.info(
             "Webhook received",
             extra={"event_id": event.event_id, "event_type": str(event.event_type)},
@@ -93,12 +97,14 @@ class WebhookService:
             stored.attempts = attempt
             self.events.mark_processed(stored)
             self.session.commit()
+            metrics.WEBHOOK_EVENTS.labels(stored.event_type, "processed").inc()
             logger.info("Webhook processed", extra={"event_id": event_id})
         except Exception as exc:
             self.session.rollback()
             stored.attempts = attempt
             self.events.mark_failed(stored, repr(exc))
             self.session.commit()
+            metrics.WEBHOOK_EVENTS.labels(stored.event_type, "failed").inc()
             logger.exception("Webhook processing failed", extra={"event_id": event_id})
 
     def maybe_analyze(self, event_id: str, analyzer: CallAnalyzer) -> None:
@@ -114,6 +120,7 @@ class WebhookService:
         except Exception:
             # The LLM is an enhancement: an outage must never break call processing.
             self.session.rollback()
+            metrics.LLM_ANALYSES.labels("error").inc()
             logger.exception("Call analysis failed", extra={"call_id": call.id})
 
     def _apply(self, event: WebhookEvent) -> None:
