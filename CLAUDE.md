@@ -5,28 +5,26 @@ This document provides guidance for AI assistants (like Claude) working with thi
 ## Repository Overview
 
 **Repository:** Abhi291712/Abhi291712
-**Status:** New/Initial Setup
-**Last Updated:** 2025-12-05
+**Status:** Active - voice-agent-gateway FastAPI service
+**Last Updated:** 2026-09-28
 
 ### Purpose
 
-[To be filled: Describe the main purpose and goals of this repository]
+voice-agent-gateway: a FastAPI backend connecting voice AI agents (e.g. Retell AI) to business systems. It manages call records, processes signed call webhooks, and exposes tool endpoints voice agents call mid-conversation. See README.md and docs/LEARN.md.
 
 ### Technology Stack
 
 [To be filled as the project develops]
 
 **Primary Languages:**
-- [Language 1]
-- [Language 2]
+- Python 3.11+
 
 **Frameworks & Libraries:**
-- [Framework 1]
-- [Framework 2]
+- FastAPI, Pydantic v2, pydantic-settings
+- SQLAlchemy 2.0 (SQLite default, PostgreSQL via DATABASE_URL), httpx
 
 **Build Tools:**
-- [Tool 1]
-- [Tool 2]
+- pip (requirements.txt / requirements-dev.txt), ruff, pytest, Docker, GitHub Actions
 
 ## Project Structure
 
@@ -238,13 +236,13 @@ git push -u origin claude/<feature-name>-<session-id>
 
 ```bash
 # Run all tests
-[command]
+pytest
 
 # Run specific test suite
-[command]
+pytest tests/test_webhooks.py
 
-# Run with coverage
-[command]
+# Lint and format check (same as CI)
+ruff check . && ruff format --check .
 ```
 
 ### Building the Project
@@ -252,14 +250,11 @@ git push -u origin claude/<feature-name>-<session-id>
 [To be filled with project-specific build commands]
 
 ```bash
-# Development build
-[command]
+# Development server
+uvicorn app.main:app --reload
 
-# Production build
-[command]
-
-# Clean build
-[command]
+# Production image + Postgres
+docker compose up --build
 ```
 
 ### Deployment
@@ -273,14 +268,11 @@ git push -u origin claude/<feature-name>-<session-id>
 [To be filled based on package manager]
 
 ```bash
-# Install all dependencies
-[npm install / pip install -r requirements.txt / etc]
-
-# Install development dependencies
-[command]
-
-# Update dependencies
-[command]
+python -m venv .venv && source .venv/bin/activate
+# Runtime only
+pip install -r requirements.txt
+# Runtime + test/lint tools
+pip install -r requirements-dev.txt
 ```
 
 ### Managing Dependencies
@@ -335,6 +327,7 @@ This document should be updated when:
 ### Document History
 
 - **2025-12-05**: Initial creation - Repository setup and template structure
+- **2026-09-28**: Added voice-agent-gateway; filled in stack, test and build commands. Layering rule: routers = HTTP only, services = business logic, repositories = DB access; every file starts with an explanatory docstring.
 
 ---
 

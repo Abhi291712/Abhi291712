@@ -1,0 +1,20 @@
+# Tool configuration for voice-agent-gateway (linting and tests).
+# Dependencies are managed in requirements.txt / requirements-dev.txt.
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# E/W: pycodestyle, F: pyflakes, I: import sorting, B: bugbear, UP: modern syntax, SIM: simplify
+select = ["E", "W", "F", "I", "B", "UP", "SIM"]
+# B008 flags Depends(...) in argument defaults, which is the standard FastAPI pattern.
+ignore = ["B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = [
+    # Upstream notice about Starlette's TestClient transport; not actionable in this project.
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]

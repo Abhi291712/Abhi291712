@@ -1,0 +1,38 @@
+# Local stack for voice-agent-gateway: the API plus a PostgreSQL database.
+#
+#   docker compose up --build
+#
+# The API is then available at http://localhost:8000 (docs at /docs).
+# Secrets below are development defaults; override them with a .env file for anything real.
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://gateway:gateway@db:5432/gateway
+      API_KEYS: ${API_KEYS:-dev-key-1}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-change-me-webhook-secret}
+      LOG_FORMAT: json
+    depends_on:
+      db:
+        condition: service_healthy # Wait until Postgres accepts connections.
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: gateway
+      POSTGRES_PASSWORD: gateway
+      POSTGRES_DB: gateway
+    volumes:
+      - pgdata:/var/lib/postgresql/data # Keeps data across container restarts.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gateway -d gateway"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
