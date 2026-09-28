@@ -16,7 +16,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import utcnow
-from app.core.errors import ConflictError, NotFoundError, UnprocessableError
+from app.core.errors import (
+    ConflictError,
+    NotFoundError,
+    ServiceUnavailableError,
+    UnprocessableError,
+)
 from app.models.call import ALLOWED_TRANSITIONS, Call, CallStatus
 from app.repositories.appointment_repo import AppointmentRepository
 from app.repositories.call_repo import CallRepository
@@ -28,6 +33,7 @@ from app.schemas.call import (
     CallRead,
     CallSummary,
 )
+from app.services.call_analysis import CallAnalysis, CallAnalyzer, analyze_call
 
 logger = logging.getLogger(__name__)
 
@@ -158,6 +164,23 @@ class CallService:
         logger.info("Call status changed", extra={"call_id": call.id, "status": str(new_status)})
         return call
 
+    def analyze(self, call_id: str, analyzer: CallAnalyzer | None) -> CallAnalysis:
+        """Run (or re-run) LLM analysis on demand, e.g. after changing the prompt."""
+        if analyzer is None:
+            raise ServiceUnavailableError(
+                "LLM analysis is not enabled (set LLM_ANALYSIS_ENABLED=true).",
+                code="LLM_DISABLED",
+            )
+        call = self.get_call(call_id)
+        if not call.transcript:
+            raise ConflictError("This call has no transcript yet.", code="NO_TRANSCRIPT")
+        result = analyze_call(self.session, call, analyzer)
+        if result is None:
+            raise ServiceUnavailableError(
+                "The model could not analyse this transcript.", code="ANALYSIS_FAILED"
+            )
+        return result
+
     def get_summary(self, call_id: str) -> CallSummary:
         """Merge the call record, webhook analysis, event timeline and bookings into one view."""
         call = self.get_call(call_id)
@@ -174,6 +197,7 @@ class CallService:
             summary=call.summary,
             sentiment=call.sentiment,
             duration_seconds=duration,
+            analysis=call.analysis,
             events=[CallEventRead.model_validate(event) for event in events],
             appointments=[CallAppointmentRead.model_validate(a) for a in appointments],
         )

@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.database import get_session_factory
 from app.core.errors import AppError
 from app.core.security import verified_retell_body
-from app.dependencies import get_appointment_service, get_webhook_service
+from app.dependencies import get_appointment_service, get_call_analyzer, get_webhook_service
 from app.integrations.retell import (
     SUPPORTED_EVENTS,
     RetellWebhook,
@@ -30,6 +30,7 @@ from app.integrations.retell import (
 )
 from app.schemas.appointment import AvailabilityRequest, BookingRequest
 from app.services.appointment_service import AppointmentService
+from app.services.call_analysis import CallAnalyzer
 from app.services.webhook_service import WebhookService, process_event_in_background
 
 router = APIRouter(tags=["retell"])
@@ -61,6 +62,7 @@ def receive_retell_webhook(
     body: RetellBody,
     service: Annotated[WebhookService, Depends(get_webhook_service)],
     session_factory: Annotated[sessionmaker[Session], Depends(get_session_factory)],
+    analyzer: Annotated[CallAnalyzer | None, Depends(get_call_analyzer)],
 ) -> RetellWebhookAck:
     try:
         webhook = RetellWebhook.model_validate(_parse_json(body))
@@ -73,7 +75,9 @@ def receive_retell_webhook(
     event = to_webhook_event(webhook)
     is_new = service.record_event(event)  # Same pipeline as the generic webhook.
     if is_new:
-        background_tasks.add_task(process_event_in_background, session_factory, event.event_id)
+        background_tasks.add_task(
+            process_event_in_background, session_factory, event.event_id, analyzer
+        )
     return RetellWebhookAck(duplicate=not is_new)
 
 

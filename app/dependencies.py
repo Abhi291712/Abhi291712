@@ -8,7 +8,7 @@ Keeping the wiring here means services and repositories stay plain Python classe
 FastAPI imports, and tests can swap any piece via ``app.dependency_overrides``.
 """
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
@@ -18,6 +18,7 @@ from app.repositories.appointment_repo import AppointmentRepository
 from app.repositories.call_repo import CallRepository
 from app.repositories.event_repo import EventRepository
 from app.services.appointment_service import AppointmentService
+from app.services.call_analysis import CallAnalyzer
 from app.services.call_service import CallService
 from app.services.webhook_service import WebhookService
 
@@ -58,3 +59,8 @@ def get_appointment_service(
     settings: Settings = Depends(get_app_settings),
 ) -> AppointmentService:
     return AppointmentService(db, appointments, calls, settings)
+
+
+def get_call_analyzer(request: Request) -> CallAnalyzer | None:
+    """The app's LLM call analyzer, or None when LLM analysis is switched off."""
+    return request.app.state.call_analyzer

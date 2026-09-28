@@ -16,12 +16,17 @@ from anyio import to_thread
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import Settings
+from app.services.call_analysis import CallAnalyzer
 from app.services.webhook_service import reprocess_pending_events
 
 logger = logging.getLogger(__name__)
 
 
-async def run_event_sweeper(session_factory: sessionmaker[Session], settings: Settings) -> None:
+async def run_event_sweeper(
+    session_factory: sessionmaker[Session],
+    settings: Settings,
+    analyzer: CallAnalyzer | None = None,
+) -> None:
     """Run until cancelled (the app's lifespan cancels it on shutdown)."""
     interval = settings.event_retry_interval_seconds
     logger.info("Event retry sweeper started", extra={"interval_seconds": interval})
@@ -35,6 +40,7 @@ async def run_event_sweeper(session_factory: sessionmaker[Session], settings: Se
                     session_factory,
                     min_age_seconds=settings.event_retry_min_age_seconds,
                     max_attempts=settings.event_max_attempts,
+                    analyzer=analyzer,
                 )
             )
         except Exception:

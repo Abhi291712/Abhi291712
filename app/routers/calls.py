@@ -10,9 +10,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, Query, Response, status
 
 from app.core.security import require_api_key
-from app.dependencies import get_call_service
+from app.dependencies import get_call_analyzer, get_call_service
 from app.models.call import CallStatus
 from app.schemas.call import CallCreate, CallList, CallRead, CallSummary, CallUpdate
+from app.services.call_analysis import CallAnalysis, CallAnalyzer
 from app.services.call_service import CallService
 
 # `dependencies=[...]` applies API key auth to every route in this router.
@@ -69,3 +70,13 @@ def get_call_summary(call_id: str, service: Service) -> CallSummary:
 @router.patch("/{call_id}", response_model=CallRead)
 def update_call(call_id: str, payload: CallUpdate, service: Service) -> CallRead:
     return service.update_status(call_id, payload.status)
+
+
+@router.post("/{call_id}/analyze", response_model=CallAnalysis)
+def analyze_call(
+    call_id: str,
+    service: Service,
+    analyzer: Annotated[CallAnalyzer | None, Depends(get_call_analyzer)],
+) -> CallAnalysis:
+    """Run LLM analysis on the call's transcript now (503 when LLM analysis is disabled)."""
+    return service.analyze(call_id, analyzer)

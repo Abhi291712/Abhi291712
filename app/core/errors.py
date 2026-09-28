@@ -70,6 +70,14 @@ class UnprocessableError(AppError):
     default_message = "The request could not be processed."
 
 
+class ServiceUnavailableError(AppError):
+    """A dependency (e.g. the LLM) is disabled or temporarily unable to serve the request."""
+
+    status_code = 503
+    code = "SERVICE_UNAVAILABLE"
+    default_message = "The service is temporarily unavailable."
+
+
 def error_response(
     request_path: str,
     status_code: int,

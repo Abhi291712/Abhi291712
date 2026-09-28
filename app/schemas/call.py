@@ -89,5 +89,8 @@ class CallSummary(CallRead):
     summary: str | None
     sentiment: str | None
     duration_seconds: int | None
+    analysis: dict | None = Field(
+        description="Structured LLM analysis (intent, follow-up, ...) when enabled."
+    )
     events: list[CallEventRead]
     appointments: list[CallAppointmentRead]

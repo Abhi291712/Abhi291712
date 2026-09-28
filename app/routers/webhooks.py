@@ -14,8 +14,9 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.database import get_session_factory
 from app.core.security import verified_webhook_body
-from app.dependencies import get_webhook_service
+from app.dependencies import get_call_analyzer, get_webhook_service
 from app.schemas.webhook import WebhookAck, WebhookEvent
+from app.services.call_analysis import CallAnalyzer
 from app.services.webhook_service import WebhookService, process_event_in_background
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
@@ -27,6 +28,7 @@ def receive_voice_webhook(
     body: Annotated[bytes, Depends(verified_webhook_body)],  # 401 if the signature is wrong.
     service: Annotated[WebhookService, Depends(get_webhook_service)],
     session_factory: Annotated[sessionmaker[Session], Depends(get_session_factory)],
+    analyzer: Annotated[CallAnalyzer | None, Depends(get_call_analyzer)],
 ) -> WebhookAck:
     # The body is parsed manually (not as a typed parameter) because the signature has to be
     # checked on the raw bytes first. Validation errors still become the standard 422.
@@ -37,6 +39,8 @@ def receive_voice_webhook(
 
     is_new = service.record_event(event)
     if is_new:
-        background_tasks.add_task(process_event_in_background, session_factory, event.event_id)
+        background_tasks.add_task(
+            process_event_in_background, session_factory, event.event_id, analyzer
+        )
     # 200 even for duplicates: the platform only needs to know it can stop retrying.
     return WebhookAck(duplicate=not is_new)

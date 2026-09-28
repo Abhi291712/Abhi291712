@@ -22,6 +22,7 @@ from app.models.event import Event, EventStatus, EventType
 from app.repositories.call_repo import CallRepository
 from app.repositories.event_repo import EventRepository
 from app.schemas.webhook import WebhookEvent
+from app.services.call_analysis import CallAnalyzer, analyze_call
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,9 @@ EVENT_TARGET_STATUS: dict[EventType, CallStatus] = {
 }
 
 UNKNOWN_AGENT = "unknown"
+
+# Events after which a transcript can exist, so LLM analysis is worth attempting.
+ANALYSIS_TRIGGERS = frozenset({EventType.CALL_ENDED, EventType.CALL_ANALYZED})
 
 
 class WebhookService:
@@ -97,6 +101,21 @@ class WebhookService:
             self.session.commit()
             logger.exception("Webhook processing failed", extra={"event_id": event_id})
 
+    def maybe_analyze(self, event_id: str, analyzer: CallAnalyzer) -> None:
+        """After a call-ending event, run LLM analysis once the transcript is available."""
+        stored = self.events.get_by_event_id(event_id)
+        if stored is None or stored.event_type not in ANALYSIS_TRIGGERS:
+            return
+        call = self.calls.get_by_external_id(stored.call_external_id)
+        if call is None or call.analysis is not None or not call.transcript:
+            return
+        try:
+            analyze_call(self.session, call, analyzer)
+        except Exception:
+            # The LLM is an enhancement: an outage must never break call processing.
+            self.session.rollback()
+            logger.exception("Call analysis failed", extra={"call_id": call.id})
+
     def _apply(self, event: WebhookEvent) -> None:
         data = event.call
         call = self.calls.get_by_external_id(data.call_id)
@@ -150,7 +169,11 @@ def build_webhook_service(session: Session) -> WebhookService:
 
 
 def reprocess_pending_events(
-    session_factory: sessionmaker[Session], *, min_age_seconds: float, max_attempts: int
+    session_factory: sessionmaker[Session],
+    *,
+    min_age_seconds: float,
+    max_attempts: int,
+    analyzer: CallAnalyzer | None = None,
 ) -> int:
     """Retry events that were never processed or that failed. Returns how many were attempted.
 
@@ -167,17 +190,25 @@ def reprocess_pending_events(
         ]
     for event_id in event_ids:
         # A fresh session per event, so one bad event cannot affect the others.
-        process_event_in_background(session_factory, event_id)
+        process_event_in_background(session_factory, event_id, analyzer)
     if event_ids:
         logger.info("Retried pending webhook events", extra={"count": len(event_ids)})
     return len(event_ids)
 
 
-def process_event_in_background(session_factory: sessionmaker[Session], event_id: str) -> None:
+def process_event_in_background(
+    session_factory: sessionmaker[Session],
+    event_id: str,
+    analyzer: CallAnalyzer | None = None,
+) -> None:
     """Entry point for FastAPI BackgroundTasks.
 
     Runs after the response has been sent, when the request's database session is already
-    closed, so it opens (and closes) its own session.
+    closed, so it opens (and closes) its own session. When LLM analysis is enabled, it also
+    analyses the call once its transcript has arrived.
     """
     with session_factory() as session:
-        build_webhook_service(session).process_event(event_id)
+        service = build_webhook_service(session)
+        service.process_event(event_id)
+        if analyzer is not None:
+            service.maybe_analyze(event_id, analyzer)

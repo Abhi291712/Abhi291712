@@ -22,6 +22,7 @@ from app.core.logging import configure_logging
 from app.middleware.rate_limit import RateLimiter, RateLimitMiddleware
 from app.middleware.request_id import RequestIdMiddleware
 from app.routers import calls, health, retell, tools, webhooks
+from app.services.call_analysis import CallAnalyzer
 from app.services.event_sweeper import run_event_sweeper
 
 logger = logging.getLogger(__name__)
@@ -49,7 +50,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         sweeper = None
         if settings.event_retry_interval_seconds > 0:
             sweeper = asyncio.create_task(
-                run_event_sweeper(app.state.session_factory, settings), name="event-sweeper"
+                run_event_sweeper(app.state.session_factory, settings, app.state.call_analyzer),
+                name="event-sweeper",
             )
         logger.info("Application started", extra={"environment": settings.environment})
         yield
@@ -70,6 +72,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = build_session_factory(engine)
+    app.state.call_analyzer = CallAnalyzer.from_settings(settings)  # None when disabled.
 
     register_exception_handlers(app)
 
