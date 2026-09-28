@@ -21,7 +21,7 @@ from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.middleware.rate_limit import RateLimiter, RateLimitMiddleware
 from app.middleware.request_id import RequestIdMiddleware
-from app.routers import calls, health, tools, webhooks
+from app.routers import calls, health, retell, tools, webhooks
 from app.services.event_sweeper import run_event_sweeper
 
 logger = logging.getLogger(__name__)
@@ -86,6 +86,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(calls.router)
     app.include_router(webhooks.router)
     app.include_router(tools.router)
+    app.include_router(retell.router)
     return app
 
 

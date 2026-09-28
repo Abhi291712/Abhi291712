@@ -23,6 +23,7 @@ from app.main import create_app
 TEST_API_KEY = "test-api-key"
 OTHER_API_KEY = "other-api-key"
 WEBHOOK_SECRET = "test-webhook-secret"
+RETELL_API_KEY = "test-retell-key"
 
 
 @pytest.fixture
@@ -44,6 +45,7 @@ def settings(tmp_path) -> Settings:
         business_open_hour=9,
         business_close_hour=17,
         appointment_slot_minutes=30,
+        retell_api_key=RETELL_API_KEY,
         event_retry_interval_seconds=0,  # Sweeper off; tests call reprocessing directly.
     )
 
