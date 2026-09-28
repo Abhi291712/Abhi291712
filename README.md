@@ -1,6 +1,6 @@
 # voice-agent-gateway
 
-A production-style FastAPI backend that connects **voice AI agents** (such as [Retell AI](https://www.retellai.com/)) to **business systems**.
+A production FastAPI backend that connects **voice AI agents**  to **business systems**.
 
 It keeps a record of every call, processes signed call lifecycle webhooks from the voice platform, and exposes **tool endpoints** that a voice agent calls in the middle of a live conversation, for example to check appointment availability and book a slot while the caller is still on the line.
 
