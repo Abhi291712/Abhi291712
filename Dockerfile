@@ -22,17 +22,22 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY app ./app
+COPY migrations ./migrations
+COPY alembic.ini .
+COPY scripts/start.sh ./scripts/start.sh
 
 # /app/data holds the SQLite file when no external database is configured.
 RUN mkdir -p /app/data && chown -R app:app /app
 USER app
 
-ENV DATABASE_URL=sqlite:////app/data/voice_ai_backend.db
+# In containers the schema is managed by Alembic migrations (see scripts/start.sh).
+ENV DATABASE_URL=sqlite:////app/data/voice_ai_backend.db \
+    AUTO_CREATE_TABLES=false
 EXPOSE 8000
 
 # Docker marks the container unhealthy if /health stops answering.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"
+    CMD python -c "import os, urllib.request as u; u.urlopen('http://127.0.0.1:%s/health' % os.environ.get('PORT', '8000'), timeout=2)"
 
-# --no-access-log: the app writes its own access lines, which include the request ID.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+# Runs migrations, then uvicorn.
+CMD ["./scripts/start.sh"]

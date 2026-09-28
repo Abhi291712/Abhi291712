@@ -3,8 +3,23 @@
 fastapi==0.141.1
 uvicorn[standard]==0.54.0
 SQLAlchemy==2.1.1
+alembic==1.20.0               # database migrations
 pydantic==2.13.5
 pydantic-settings==2.15.0
 httpx==0.28.1
 # PostgreSQL driver, only used when DATABASE_URL points at Postgres.
 psycopg[binary]==3.3.6
+# Time zone database, so BUSINESS_TIMEZONE works on slim images and Windows.
+tzdata==2026.4
+
+# Optional integrations (imported only when their settings are configured).
+anthropic==1.8.0              # LLM call analysis with Claude
+redis==8.1.0                  # shared rate limiting across instances
+google-auth==2.58.1           # Google Calendar service-account authentication
+requests==2.34.2              # transport google-auth uses to refresh tokens
+
+# Observability.
+prometheus-client==0.26.0
+opentelemetry-sdk==1.45.0
+opentelemetry-exporter-otlp-proto-http==1.45.0
+opentelemetry-instrumentation-fastapi==0.66b0

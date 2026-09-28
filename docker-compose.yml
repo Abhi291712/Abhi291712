@@ -1,8 +1,8 @@
-# Local stack for voice-ai-backend: the API plus a PostgreSQL database.
+# Local production-like stack for voice-ai-backend: the API, PostgreSQL and Redis.
 #
 #   docker compose up --build
 #
-# The API is then available at http://localhost:8000 (docs at /docs).
+# The API is then available at http://localhost:8000 (docs at /docs, metrics at /metrics).
 # Secrets below are development defaults; override them with a .env file for anything real.
 
 services:
@@ -12,12 +12,19 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql+psycopg://voiceai:voiceai@db:5432/voiceai
+      REDIS_URL: redis://redis:6379/0 # Shared rate limits across API instances.
       API_KEYS: ${API_KEYS:-dev-key-1}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:-change-me-webhook-secret}
+      RETELL_API_KEY: ${RETELL_API_KEY:-}
+      LLM_ANALYSIS_ENABLED: ${LLM_ANALYSIS_ENABLED:-false}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      BUSINESS_TIMEZONE: ${BUSINESS_TIMEZONE:-UTC}
       LOG_FORMAT: json
     depends_on:
       db:
         condition: service_healthy # Wait until Postgres accepts connections.
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
   db:
@@ -30,6 +37,14 @@ services:
       - pgdata:/var/lib/postgresql/data # Keeps data across container restarts.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U voiceai -d voiceai"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10

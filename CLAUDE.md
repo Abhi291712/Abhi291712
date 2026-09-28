@@ -328,6 +328,7 @@ This document should be updated when:
 
 - **2025-12-05**: Initial creation - Repository setup and template structure
 - **2026-09-28**: Added voice-ai-backend; filled in stack, test and build commands. Layering rule: routers = HTTP only, services = business logic, repositories = DB access; every file starts with an explanatory docstring.
+- **2026-09-28**: Added Retell integration (app/integrations), Claude call analysis, Alembic migrations (run `alembic revision --autogenerate` after model changes; tests/test_migrations.py fails if they drift), retry sweeper, Redis rate limiting, metrics/tracing, Google Calendar sync, evals (`python -m evals.run_booking_eval` runs in CI) and deploy docs (docs/DEPLOY.md). External services are always faked in tests.
 
 ---
 

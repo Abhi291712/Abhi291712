@@ -68,3 +68,14 @@ def test_log_lines_carry_request_id(client, caplog):
 
     access_lines = [r for r in caplog.records if r.name == "app.access"]
     assert access_lines and all(r.request_id == "log-check-1" for r in access_lines)
+
+
+def test_platform_postgres_urls_use_installed_driver():
+    from app.core.config import Settings
+
+    for url in ("postgres://u:p@db:5432/app", "postgresql://u:p@db:5432/app"):
+        assert Settings(_env_file=None, database_url=url).database_url == (
+            "postgresql+psycopg://u:p@db:5432/app"
+        )
+    explicit = "postgresql+psycopg://u:p@db/app"
+    assert Settings(_env_file=None, database_url=explicit).database_url == explicit

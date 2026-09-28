@@ -30,3 +30,7 @@ jobs:
 
       - name: Test (pytest)
         run: pytest
+
+      # Replays realistic agent conversations and fails on wrong answers or slow responses.
+      - name: Eval (voice agent tools)
+        run: python -m evals.run_booking_eval

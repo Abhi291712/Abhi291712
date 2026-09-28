@@ -1,0 +1,71 @@
+[
+  {
+    "name": "happy path: check, then book",
+    "steps": [
+      {"tool": "check-availability", "args": {"date": "{date}"},
+       "expect": {"status": 200, "json": {"available": true}, "message_contains": ["9:00 AM"]}},
+      {"tool": "book-appointment",
+       "args": {"customer_name": "Jane Doe", "customer_phone": "+14155550123", "start_time": "{date}T10:00:00"},
+       "expect": {"status": 201, "message_contains": ["You're all set, Jane", "10:00 AM"]}}
+    ]
+  },
+  {
+    "name": "booked slot disappears from availability",
+    "steps": [
+      {"tool": "book-appointment",
+       "args": {"customer_name": "Sam Lee", "customer_phone": "+14155550124", "start_time": "{date}T09:00:00"},
+       "expect": {"status": 201}},
+      {"tool": "check-availability", "args": {"date": "{date}"},
+       "expect": {"status": 200, "message_contains": ["9:30 AM"], "message_excludes": ["9:00 AM"]}}
+    ]
+  },
+  {
+    "name": "double booking offers alternatives",
+    "steps": [
+      {"tool": "book-appointment",
+       "args": {"customer_name": "Ann Park", "customer_phone": "+14155550125", "start_time": "{date}T11:00:00"},
+       "expect": {"status": 201}},
+      {"tool": "book-appointment",
+       "args": {"customer_name": "Bo Chen", "customer_phone": "+14155550126", "start_time": "{date}T11:00:00"},
+       "expect": {"status": 409, "message_contains": ["no longer available", "9:00 AM"]}}
+    ]
+  },
+  {
+    "name": "outside business hours is explained",
+    "steps": [
+      {"tool": "book-appointment",
+       "args": {"customer_name": "Cy Diaz", "customer_phone": "+14155550127", "start_time": "{date}T20:00:00"},
+       "expect": {"status": 422, "message_contains": ["appointments start every"]}}
+    ]
+  },
+  {
+    "name": "misaligned time is rejected",
+    "steps": [
+      {"tool": "book-appointment",
+       "args": {"customer_name": "Di Evans", "customer_phone": "+14155550128", "start_time": "{date}T10:15:00"},
+       "expect": {"status": 422}}
+    ]
+  },
+  {
+    "name": "missing details get a spoken prompt",
+    "steps": [
+      {"tool": "book-appointment", "args": {"customer_name": "Ed Fox", "start_time": "{date}T10:00:00"},
+       "expect": {"status": 422, "message_contains": ["missing some details"]}}
+    ]
+  },
+  {
+    "name": "a past date has no openings",
+    "steps": [
+      {"tool": "check-availability", "args": {"date": "2020-01-15"},
+       "expect": {"status": 200, "json": {"available": false}, "message_contains": ["no openings"]}}
+    ]
+  },
+  {
+    "name": "explicit UTC offset is understood",
+    "steps": [
+      {"tool": "book-appointment",
+       "args": {"customer_name": "Flo Gray", "customer_phone": "+14155550129", "start_time": "{date}T12:00:00+02:00"},
+       "expect": {"status": 201, "message_contains": ["10:00 AM"]}}
+    ]
+  }
+]

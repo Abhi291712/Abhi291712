@@ -13,7 +13,7 @@ from functools import lru_cache
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -83,6 +83,16 @@ class Settings(BaseSettings):
     voice_platform_api_key: str = "replace-me"
     voice_platform_timeout_seconds: float = 10.0
     voice_platform_max_retries: int = Field(default=3, ge=0)
+
+    @field_validator("database_url")
+    @classmethod
+    def use_installed_postgres_driver(cls, url: str) -> str:
+        # Hosting platforms hand out "postgres://..." or "postgresql://..." URLs, which
+        # SQLAlchemy maps to the psycopg2 driver. This project ships psycopg 3 instead.
+        for prefix in ("postgres://", "postgresql://"):
+            if url.startswith(prefix):
+                return "postgresql+psycopg://" + url[len(prefix) :]
+        return url
 
     @model_validator(mode="after")
     def check_settings(self) -> "Settings":

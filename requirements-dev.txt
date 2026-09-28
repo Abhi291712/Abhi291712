@@ -1,4 +1,5 @@
-# Development and CI dependencies: runtime deps plus the test runner and linter.
+# Development and CI dependencies: runtime deps plus the test runner, linter and test doubles.
 -r requirements.txt
 pytest==9.1.1
 ruff==0.16.9
+fakeredis[lua]==2.38.0        # in-memory Redis that runs the rate limiter's Lua script
