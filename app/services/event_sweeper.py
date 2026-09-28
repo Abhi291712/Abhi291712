@@ -1,4 +1,5 @@
-"""Background loop that retries webhook events which were not processed successfully.
+"""Background loop that retries work that did not complete: webhook events that were
+not processed successfully, and bookings not yet copied to the external calendar.
 
 FastAPI's ``BackgroundTasks`` run inside the web process. If that process stops between storing
 an event and processing it (a deploy, a crash, a scaling event), the event would otherwise sit
@@ -16,6 +17,8 @@ from anyio import to_thread
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import Settings
+from app.integrations.google_calendar import GoogleCalendarClient
+from app.services.appointment_service import sync_pending_appointments
 from app.services.call_analysis import CallAnalyzer
 from app.services.webhook_service import reprocess_pending_events
 
@@ -26,6 +29,7 @@ async def run_event_sweeper(
     session_factory: sessionmaker[Session],
     settings: Settings,
     analyzer: CallAnalyzer | None = None,
+    calendar: GoogleCalendarClient | None = None,
 ) -> None:
     """Run until cancelled (the app's lifespan cancels it on shutdown)."""
     interval = settings.event_retry_interval_seconds
@@ -43,6 +47,15 @@ async def run_event_sweeper(
                     analyzer=analyzer,
                 )
             )
+            if calendar is not None:
+                # Bookings whose calendar copy failed earlier (e.g. Google was down).
+                await to_thread.run_sync(
+                    lambda: sync_pending_appointments(
+                        session_factory,
+                        calendar,
+                        min_age_seconds=settings.event_retry_min_age_seconds,
+                    )
+                )
         except Exception:
             # Never let one bad sweep (e.g. the database briefly unavailable) stop the loop.
             logger.exception("Event retry sweep failed")

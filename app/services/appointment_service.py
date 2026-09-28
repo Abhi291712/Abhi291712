@@ -14,11 +14,13 @@ import logging
 from datetime import UTC, date, datetime, time, timedelta, tzinfo
 
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
+from app.core import metrics
 from app.core.config import Settings
 from app.core.database import utcnow
 from app.core.errors import ConflictError, UnprocessableError
+from app.integrations.google_calendar import CalendarError, GoogleCalendarClient, overlaps
 from app.models.appointment import Appointment
 from app.repositories.appointment_repo import AppointmentRepository
 from app.repositories.call_repo import CallRepository
@@ -63,11 +65,13 @@ class AppointmentService:
         appointments: AppointmentRepository,
         calls: CallRepository,
         settings: Settings,
+        calendar: GoogleCalendarClient | None = None,
     ) -> None:
         self.session = session
         self.appointments = appointments
         self.calls = calls
         self.settings = settings
+        self.calendar = calendar  # Optional external calendar (Google), see integrations.
 
     @property
     def slot_length(self) -> timedelta:
@@ -99,15 +103,33 @@ class AppointmentService:
         """UTC start times already taken on the local `day`."""
         return {a.start_time for a in self.appointments.list_between(*self._day_bounds_utc(day))}
 
+    def calendar_busy(self, day: date) -> list[tuple[datetime, datetime]]:
+        """Busy intervals from the external calendar, or [] if none is configured.
+
+        If the calendar cannot be reached, scheduling continues with local bookings only: a
+        caller waiting on the phone matters more than a perfect view of the calendar.
+        """
+        if self.calendar is None:
+            return []
+        try:
+            return self.calendar.busy_intervals(*self._day_bounds_utc(day))
+        except CalendarError:
+            metrics.CALENDAR_SYNCS.labels("busy_lookup_failed").inc()
+            logger.warning("Calendar busy lookup failed; using local bookings only", exc_info=True)
+            return []
+
     def free_slots(self, day: date) -> list[datetime]:
-        """Slots on `day` that are in the future and not yet booked (local time)."""
+        """Slots on `day` that are in the future, not booked and not busy (local time)."""
         booked = self.booked_starts(day)
+        busy = self.calendar_busy(day)
         now = utcnow()
         return [
             slot
             for slot in self.slots_for_day(day)
             # Aware datetimes compare correctly across time zones, so local vs UTC is fine.
-            if slot > now and slot.astimezone(UTC) not in booked
+            if slot > now
+            and slot.astimezone(UTC) not in booked
+            and not overlaps(slot, slot + self.slot_length, busy)
         ]
 
     def check_availability(self, request: AvailabilityRequest) -> AvailabilityResponse:
@@ -141,6 +163,8 @@ class AppointmentService:
             )
         if self.appointments.get_by_start_time(start.astimezone(UTC)):
             raise self._slot_taken(start)
+        if overlaps(start, start + self.slot_length, self.calendar_busy(start.date())):
+            raise self._slot_taken(start)  # Blocked in the business's own calendar.
 
         # Link the booking to the call record when the agent passes the platform call ID.
         call = self.calls.get_by_external_id(request.call_id) if request.call_id else None
@@ -182,3 +206,51 @@ class AppointmentService:
         else:
             message = "Sorry, that time is no longer available, and that day is fully booked."
         return ConflictError(message, code="SLOT_UNAVAILABLE")
+
+
+def sync_appointment_to_calendar(
+    session_factory: sessionmaker[Session], calendar: GoogleCalendarClient, appointment_id: str
+) -> bool:
+    """Copy a booking into the external calendar. Runs as a background task after the booking
+    response has been sent (and again from the retry sweeper if it failed). Returns success."""
+    with session_factory() as session:
+        repo = AppointmentRepository(session)
+        appointment = repo.get(appointment_id)
+        if appointment is None or appointment.calendar_event_id:
+            return True  # Gone or already synced: nothing to do.
+        try:
+            event_id = calendar.create_event(
+                appointment_id=appointment.id,
+                summary=f"Appointment: {appointment.customer_name}",
+                description=f"Booked by the voice agent. Phone: {appointment.customer_phone}",
+                start=appointment.start_time,
+                end=appointment.end_time,
+            )
+        except CalendarError:
+            metrics.CALENDAR_SYNCS.labels("failed").inc()
+            logger.warning(
+                "Calendar sync failed; will retry", extra={"appointment_id": appointment_id}
+            )
+            return False
+        appointment.calendar_event_id = event_id
+        session.commit()
+        metrics.CALENDAR_SYNCS.labels("created").inc()
+        return True
+
+
+def sync_pending_appointments(
+    session_factory: sessionmaker[Session],
+    calendar: GoogleCalendarClient,
+    *,
+    min_age_seconds: float,
+) -> int:
+    """Retry calendar sync for upcoming appointments that are not in the calendar yet."""
+    now = utcnow()
+    with session_factory() as session:
+        pending = [
+            a.id
+            for a in AppointmentRepository(session).list_unsynced(
+                created_before=now - timedelta(seconds=min_age_seconds), starting_after=now
+            )
+        ]
+    return sum(sync_appointment_to_calendar(session_factory, calendar, i) for i in pending)

@@ -20,6 +20,7 @@ from app.core.database import build_engine, build_session_factory, init_db
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.tracing import setup_tracing
+from app.integrations.google_calendar import GoogleCalendarClient
 from app.middleware.metrics import MetricsMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware, build_limiter
 from app.middleware.request_id import RequestIdMiddleware
@@ -52,7 +53,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         sweeper = None
         if settings.event_retry_interval_seconds > 0:
             sweeper = asyncio.create_task(
-                run_event_sweeper(app.state.session_factory, settings, app.state.call_analyzer),
+                run_event_sweeper(
+                    app.state.session_factory,
+                    settings,
+                    app.state.call_analyzer,
+                    app.state.calendar,
+                ),
                 name="event-sweeper",
             )
         logger.info("Application started", extra={"environment": settings.environment})
@@ -75,6 +81,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.engine = engine
     app.state.session_factory = build_session_factory(engine)
     app.state.call_analyzer = CallAnalyzer.from_settings(settings)  # None when disabled.
+    app.state.calendar = GoogleCalendarClient.from_settings(settings)  # None when disabled.
 
     register_exception_handlers(app)
 

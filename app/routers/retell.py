@@ -21,7 +21,13 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.database import get_session_factory
 from app.core.errors import AppError
 from app.core.security import verified_retell_body
-from app.dependencies import get_appointment_service, get_call_analyzer, get_webhook_service
+from app.dependencies import (
+    get_appointment_service,
+    get_calendar,
+    get_call_analyzer,
+    get_webhook_service,
+)
+from app.integrations.google_calendar import GoogleCalendarClient
 from app.integrations.retell import (
     SUPPORTED_EVENTS,
     RetellWebhook,
@@ -29,7 +35,7 @@ from app.integrations.retell import (
     to_webhook_event,
 )
 from app.schemas.appointment import AvailabilityRequest, BookingRequest
-from app.services.appointment_service import AppointmentService
+from app.services.appointment_service import AppointmentService, sync_appointment_to_calendar
 from app.services.call_analysis import CallAnalyzer
 from app.services.webhook_service import WebhookService, process_event_in_background
 
@@ -100,6 +106,17 @@ def retell_check_availability(body: RetellBody, service: Appointments) -> dict[s
 
 
 @router.post("/retell/functions/book-appointment")
-def retell_book_appointment(body: RetellBody, service: Appointments) -> dict[str, Any]:
+def retell_book_appointment(
+    body: RetellBody,
+    service: Appointments,
+    background_tasks: BackgroundTasks,
+    calendar: Annotated[GoogleCalendarClient | None, Depends(get_calendar)],
+    session_factory: Annotated[sessionmaker[Session], Depends(get_session_factory)],
+) -> dict[str, Any]:
     args = extract_function_args(_parse_json(body))
-    return _function_result(lambda: service.book(BookingRequest.model_validate(args)))
+    result = _function_result(lambda: service.book(BookingRequest.model_validate(args)))
+    if result["ok"] and calendar is not None:
+        background_tasks.add_task(
+            sync_appointment_to_calendar, session_factory, calendar, result["appointment_id"]
+        )
+    return result

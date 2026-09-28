@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings
 from app.core.database import get_db
 from app.core.security import get_app_settings
+from app.integrations.google_calendar import GoogleCalendarClient
 from app.repositories.appointment_repo import AppointmentRepository
 from app.repositories.call_repo import CallRepository
 from app.repositories.event_repo import EventRepository
@@ -21,6 +22,11 @@ from app.services.appointment_service import AppointmentService
 from app.services.call_analysis import CallAnalyzer
 from app.services.call_service import CallService
 from app.services.webhook_service import WebhookService
+
+
+def get_calendar(request: Request) -> GoogleCalendarClient | None:
+    """The external calendar client, or None when calendar sync is not configured."""
+    return request.app.state.calendar
 
 
 def get_call_repository(db: Session = Depends(get_db)) -> CallRepository:
@@ -57,8 +63,9 @@ def get_appointment_service(
     appointments: AppointmentRepository = Depends(get_appointment_repository),
     calls: CallRepository = Depends(get_call_repository),
     settings: Settings = Depends(get_app_settings),
+    calendar: GoogleCalendarClient | None = Depends(get_calendar),
 ) -> AppointmentService:
-    return AppointmentService(db, appointments, calls, settings)
+    return AppointmentService(db, appointments, calls, settings, calendar)
 
 
 def get_call_analyzer(request: Request) -> CallAnalyzer | None:
